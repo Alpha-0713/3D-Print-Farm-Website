@@ -1,7 +1,6 @@
 import {
   DEMO_STAFF,
   DEMO_STUDENT,
-  LAYER_HEIGHTS,
   MATERIALS,
   MOCK_JOBS,
   MOCK_NOTIFICATIONS,
@@ -47,7 +46,6 @@ function isValidState(value) {
     && typeof job.fileSize === "string"
     && typeof job.material === "string"
     && typeof job.color === "string"
-    && typeof job.layerHeight === "string"
     && typeof job.submittedAt === "string"
     && STATUSES.includes(job.status)
     && (job.assignedStaff === null || typeof job.assignedStaff === "string")
@@ -171,11 +169,6 @@ function validatePayload(payload) {
     && item.color.toLowerCase() === payload.color.trim().toLowerCase()
   ));
   assert(option && option.available && Number(option.quantity) > 0, "That material and color are no longer available. Refresh the options and choose an available filament.");
-  assert(LAYER_HEIGHTS.includes(payload.layerHeight), "Choose a listed layer height.");
-  assert(
-    Number(payload.infill) >= 10 && Number(payload.infill) <= 100,
-    "Infill must be between 10% and 100%.",
-  );
 }
 
 export const jobsService = {
@@ -238,8 +231,6 @@ export const jobsService = {
         fileSize: formatFileSize(payload.file.sizeBytes),
         material: payload.material,
         color: payload.color,
-        layerHeight: payload.layerHeight,
-        infill: Number(payload.infill),
         purpose: payload.purpose || "Not specified",
         notes: payload.notes || "",
         submittedAt,

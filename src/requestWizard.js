@@ -1,4 +1,4 @@
-import { LAYER_HEIGHTS, MATERIALS } from "./data.js?v=8";
+import { MATERIALS } from "./data.js?v=8";
 import { inventoryService } from "./services.js?v=8";
 import { esc, footer, moneylessId, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=8";
 
@@ -175,27 +175,6 @@ function wizardPanel(state, availableFilaments) {
     <small>Choose a combination staff have marked available in the current inventory.</small>\
   </label>\
   ${selectedFilament ? `<div class="material-choice-detail full-field"><span class="filament-swatch" style="--filament-color:${/^(#[\\da-f]{3,8}|[a-z]{1,24})$/i.test(selectedFilament.color) ? selectedFilament.color : "#899080"}" aria-hidden="true"></span><div><strong>${esc(selectedFilament.material)} · ${esc(selectedFilament.color)}</strong><p>${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.description || "Supported print filament.")}</p><small>Good for: ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.uses || "Staff review required")} · ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.considerations || "Ask staff about printer compatibility.")} · ${Number(selectedFilament.quantity)} ${esc(selectedFilament.unit)} in inventory</small></div></div>` : `<div class="empty-inventory-note full-field"><strong>No filament is currently listed as available.</strong><p>Staff must enter a color and a positive stock amount in the Materials section before you can request it.</p></div>`}\
-  ${fieldSelect("layerHeight", "Layer height", LAYER_HEIGHTS, w.layerHeight, "A requested preference, not a printer instruction.")}\
-  <label class="field">\
-    <span>\
-      Infill preference \
-      <output id="infill-output">\
-        ${w.infill}%\
-      </output>\
-    </span>\
-    <input type="range" min="10" max="100" step="5" value="${w.infill}" data-field="infill" aria-label="Infill preference, from 10 to 100 percent" />\
-    <div class="range-ends">\
-      <small>\
-        10%\
-      </small>\
-      <small>\
-        100%\
-      </small>\
-    </div>\
-    <small>\
-      A requested preference for staff review.\
-    </small>\
-  </label>\
 </div>\
 <div class="inventory-banner">\
   <span>\
@@ -357,22 +336,6 @@ ${reviewCard(w)}\
             ${esc(w.color || "—")}\
           </strong>\
         </div>\
-        <div>\
-          <span>\
-            Layer height\
-          </span>\
-          <strong>\
-            ${esc(w.layerHeight)}\
-          </strong>\
-        </div>\
-        <div>\
-          <span>\
-            Infill\
-          </span>\
-          <strong>\
-            ${Number(w.infill)}%\
-          </strong>\
-        </div>\
       </div>\
       <div class="estimate-note">\
         <span>\
@@ -404,7 +367,7 @@ ${reviewCard(w)}\
 }
 
 function reviewCard(w) {
-  const rows = [["File", w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : "Choose a file"], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Layer height", w.layerHeight], ["Infill preference", `${w.infill}%`], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", w.notes || "None"]];
+  const rows = [["File", w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : "Choose a file"], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", w.notes || "None"]];
   return `<div class="review-card">\
   ${rows.map(([label, value], i) => `<div class="review-row ${i > 4 ? "review-detail" : ""}">\
   <span>\

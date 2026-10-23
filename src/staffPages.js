@@ -617,7 +617,7 @@ export async function jobDetailsPage(jobId) {
         </span>\
       </div>\
       <div class="detail-grid">\
-        ${[["Submitted by", `${job.submitterName} · ${job.submitterEmail}`], ["Material", job.material], ["Color preference", job.color], ["Layer height", job.layerHeight], ["Infill preference", `${job.infill}%`], ["Purpose", job.purpose], ["Assigned staff", job.assignedStaff || "Unassigned"], ["Recipient email", job.recipientEmail]].map(([label, value]) => `<div>\
+        ${[["Submitted by", `${job.submitterName} · ${job.submitterEmail}`], ["Material", job.material], ["Color preference", job.color], ["Purpose", job.purpose], ["Assigned staff", job.assignedStaff || "Unassigned"], ["Recipient email", job.recipientEmail]].map(([label, value]) => `<div>\
   <span>\
     ${label}\
   </span>\

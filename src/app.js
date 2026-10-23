@@ -38,8 +38,6 @@ const state = {
     notes: "",
     material: "PLA",
     color: "Black",
-    layerHeight: "0.20 mm",
-    infill: 20,
     submittedJob: null,
   },
 };
@@ -600,8 +598,6 @@ async function doAction(action, target) {
         notes: "",
         material: "PLA",
         color: "Black",
-        layerHeight: "0.20 mm",
-        infill: 20,
         submittedJob: null,
       };
       await render();
@@ -692,13 +688,11 @@ app.addEventListener("input", (event) => {
 
   if (target.matches("[data-field]")) {
     const key = target.dataset.field;
-    state.wizard[key] = key === "infill" ? Number(target.value) : target.value;
+    state.wizard[key] = target.value;
 
     const counter = document.querySelector(`[data-counter="${key}"]`);
     if (counter) counter.textContent = target.value.length;
 
-    const output = document.querySelector("#infill-output");
-    if (key === "infill" && output) output.textContent = `${target.value}%`;
   }
 
   if (target.matches('[data-filter="search"]')) {
@@ -727,7 +721,7 @@ app.addEventListener("change", async (event) => {
 
   if (target.matches("[data-field]")) {
     const key = target.dataset.field;
-    state.wizard[key] = key === "infill" ? Number(target.value) : target.value;
+    state.wizard[key] = target.value;
 
     if (key === "inventoryId") {
       const selection = await inventoryService.getItem(target.value);
@@ -739,7 +733,7 @@ app.addEventListener("change", async (event) => {
       return;
     }
 
-    if (key === "material" || key === "color" || key === "layerHeight") {
+    if (key === "material" || key === "color") {
       const panel = document.querySelector(".wizard-layout");
       if (panel) render();
     }
