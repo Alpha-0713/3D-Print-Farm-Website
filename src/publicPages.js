@@ -50,9 +50,9 @@ export function homePage(scrollTo = "", state, inventory = []) {
   </section>
   <section class="faq-section section-pad" id="faq">
     <div class="faq-intro">
-      <span class="eyebrow"><i></i> 02 / GOOD QUESTIONS</span>
+      <span class="eyebrow"><i></i> 02 / FAQ</span>
       <h2>Before you<br />press print.</h2>
-      <p>Helpful basics for planning a request. Staff will check the final details with you.</p>
+      <p>Helpful basics or frequently asked questions for planning a request. Staff will check the final details with you.</p>
     </div>
     <div class="faq-list">
       <details>
