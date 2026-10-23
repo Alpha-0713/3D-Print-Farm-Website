@@ -1,4 +1,3 @@
-import { MATERIALS } from "./data.js?v=8";
 import { contributionsService, inventoryService, jobsService } from "./services.js?v=8";
 import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=8";
 import { notificationsService } from "./notificationsService.js?v=8";
@@ -10,9 +9,10 @@ import {
   activeJobsPage,
   jobDetailsPage,
   staffHours,
+  staffMaterialDetail,
+  staffMaterialForm,
   staffMaterials,
   staffOverview,
-  staffQueue,
 } from "./staffPages.js?v=8";
 
 const app = document.querySelector("#app");
@@ -20,7 +20,6 @@ const toastRoot = document.querySelector("#toast-root");
 
 const state = {
   menuOpen: false,
-  queue: { search: "", status: "ALL", material: "ALL", sort: "newest" },
   hoursFilters: { student: "", from: "", to: "" },
   hoursEditingId: "",
   wizard: {
@@ -41,6 +40,14 @@ const state = {
     submittedJob: null,
   },
 };
+
+function decodeRouteId(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return "";
+  }
+}
 
 let modelPreviewModule;
 let renderRevision = 0;
@@ -64,16 +71,7 @@ if (savedDraft) {
 
 function parseRoute() {
   const rawValue = location.hash.slice(1) || "/";
-  const query = rawValue.split("?")[1] || "";
   const value = rawValue.split("?")[0];
-  const queryMaterial = new URLSearchParams(query).get("material");
-
-  if (
-    value === "/staff/queue"
-    && MATERIALS.some(({ id }) => id === queryMaterial)
-  ) {
-    state.queue.material = queryMaterial;
-  }
 
   const section = value.match(/^\/section\/([^/?#]+)/);
   if (section) {
@@ -83,13 +81,17 @@ function parseRoute() {
 
   const detail = value.match(/^\/staff\/jobs\/([^/?#]+)/);
   if (detail) {
-    return { page: "job", id: decodeURIComponent(detail[1]) };
+    return { page: "job", id: decodeRouteId(detail[1]) };
   }
+
+  if (value === "/staff/materials/new") return { page: "material-new" };
+  const filament = value.match(/^\/staff\/materials\/([^/?#]+)$/);
+  if (filament) return { page: "filament", id: decodeRouteId(filament[1]) };
 
   if (value === "/get-started") return { page: "get-started" };
   if (value === "/my-jobs") return { page: "my-jobs" };
   if (value === "/staff" || value === "/staff/") return { page: "staff" };
-  if (value === "/staff/queue") return { page: "queue" };
+  if (value === "/staff/queue") return { page: "staff", redirect: true };
   if (value === "/staff/active") return { page: "active" };
   if (value === "/staff/materials") return { page: "materials" };
   if (value === "/staff/hours") return { page: "hours" };
@@ -101,7 +103,11 @@ async function render() {
   const revision = ++renderRevision;
   modelPreviewModule?.disposeModelPreview();
   const route = parseRoute();
-  const staffPages = ["staff", "queue", "active", "materials", "hours", "job"];
+  if (route.redirect) {
+    location.hash = "#/staff";
+    return;
+  }
+  const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
     document.title = "Staff Portal · 3D Print Farm";
@@ -121,12 +127,14 @@ async function render() {
     app.innerHTML = await myJobsPage(state);
   } else if (route.page === "staff") {
     app.innerHTML = await staffOverview();
-  } else if (route.page === "queue") {
-    app.innerHTML = await staffQueue(state.queue);
   } else if (route.page === "active") {
     app.innerHTML = await activeJobsPage();
   } else if (route.page === "materials") {
     app.innerHTML = await staffMaterials();
+  } else if (route.page === "material-new") {
+    app.innerHTML = staffMaterialForm();
+  } else if (route.page === "filament") {
+    app.innerHTML = await staffMaterialDetail(route.id);
   } else if (route.page === "hours") {
     app.innerHTML = await staffHours(state.hoursFilters, state.hoursEditingId);
   } else if (route.page === "job") {
@@ -654,6 +662,7 @@ app.addEventListener("submit", async (event) => {
   try {
     if (action === "inventory-add") {
       await inventoryService.add({ ...values, available: values.available === "true" });
+      location.hash = "#/staff/materials";
       await render();
       toast("Filament inventory entry added.");
     } else if (action === "inventory-update") {
@@ -695,16 +704,6 @@ app.addEventListener("input", (event) => {
 
   }
 
-  if (target.matches('[data-filter="search"]')) {
-    state.queue.search = target.value;
-    const position = target.selectionStart;
-
-    render().then(() => {
-      const search = document.querySelector('[data-filter="search"]');
-      search?.focus();
-      search?.setSelectionRange(position, position);
-    });
-  }
 });
 
 app.addEventListener("change", async (event) => {
@@ -739,10 +738,6 @@ app.addEventListener("change", async (event) => {
     }
   }
 
-  if (target.matches("[data-filter]")) {
-    state.queue[target.dataset.filter] = target.value;
-    render();
-  }
 });
 
 app.addEventListener("dragover", (event) => {

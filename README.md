@@ -39,12 +39,15 @@ An internet connection is required to load the pinned Three.js and fflate previe
 | `#/get-started` | Four-step request wizard |
 | `#/my-jobs` | Student demo job tracking |
 | `#/staff` | Staff overview |
-| `#/staff/queue` | Searchable and filterable job queue |
 | `#/staff/active` | Jobs assigned to the demo staff member |
-| `#/staff/materials` | Filament inventory management |
+| `#/staff/materials` | Current filament inventory |
+| `#/staff/materials/new` | Add a filament entry |
+| `#/staff/materials/:id` | Filament details, editing, and stock adjustments |
 | `#/staff/hours` | Student contribution hours |
 | `#/staff/jobs/:id` | Job details and status actions |
 | `#/section/faq` | Public FAQ anchor |
+
+Legacy links to `#/staff/queue` redirect to the Staff Overview.
 
 ## v1.1.1 release summary
 
@@ -71,6 +74,8 @@ The **Good questions** FAQ explains what filament is and compares the supported 
 ### Staff Portal
 
 Text, fields, navigation, tables, and buttons use larger, more consistent type, stronger contrast, and more comfortable spacing. The layout supports desktop, tablet, and smaller screens.
+
+The Overview shows four job counts—unclaimed, in progress, printing, and completed today—followed by a table of the six most recently submitted requests. Selecting a row opens its job details. The **My active jobs** page lists work assigned to the demo staff profile.
 
 ### Filament inventory
 

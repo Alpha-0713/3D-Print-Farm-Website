@@ -1,11 +1,11 @@
-import { DEMO_STAFF, MATERIALS, STATUSES } from "./data.js?v=8";
+import { DEMO_STAFF, MATERIALS } from "./data.js?v=8";
 import { contributionsService, inventoryService, jobsService } from "./services.js?v=8";
 import { notificationsService } from "./notificationsService.js?v=8";
 import { dateTime, esc, logo, moneylessId, shortDate, statusBadge } from "./pageShared.js?v=8";
 
 function staffShell(content, active = "overview") {
-  const links = [["overview", "Overview", "⌂", "#/staff"], ["queue", "Print queue", "▤", "#/staff/queue"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]];
-  const pageLabel = ({ overview: "Overview", queue: "Print queue", active: "My active jobs", materials: "Materials", hours: "My Hours" })[active] || "Staff Portal";
+  const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]];
+  const pageLabel = ({ overview: "Overview", active: "My active jobs", materials: "Materials", "material-new": "Add filament", hours: "My Hours" })[active] || "Staff Portal";
   return `<div class="staff-app">\
   <aside class="staff-sidebar">\
     <div class="sidebar-brand">\
@@ -26,11 +26,11 @@ function staffShell(content, active = "overview") {
       </strong>\
     </div>\
     <nav aria-label="Staff navigation">\
-      ${links.map(([id, label, icon, href]) => `<a class="sidebar-link ${active === id ? "selected" : ""}" href="${href}" ${active === id ? 'aria-current="page"' : ""}>\
+  ${links.map(([id, label, icon, href]) => `<a class="sidebar-link ${active === id ? "selected" : ""}" href="${href}" ${active === id ? 'aria-current="page"' : ""}>\
   <span>\
     ${icon}\
   </span>\
-  ${label}${id === "queue" ? "" : ""}\
+  ${label}\
 </a>`).join("")}\
     </nav>\
     <div class="sidebar-bottom">\
@@ -86,106 +86,44 @@ function staffShell(content, active = "overview") {
 </div>`;
 }
 
-function jobTable(jobs, compact = false) {
-  if (!jobs.length) return `<div class="empty-state queue-empty">\
-  <span>\
-    ⌁\
-  </span>\
-  <h2>\
-    No jobs match\
-  </h2>\
-  <p>\
-    Try changing your search or filters.\
-  </p>\
+function jobTable(jobs) {
+  if (!jobs.length) return `<div class="empty-state overview-empty">
+  <span>⌁</span>
+  <h2>No jobs yet</h2>
+  <p>Submitted print requests will appear here.</p>
 </div>`;
-  return `<div class="table-wrap">\
-  <table>\
-    <thead>\
-      <tr>\
-        <th>\
-          Job / Project\
-        </th>\
-        <th>\
-          Submitted by\
-        </th>\
-        <th>\
-          File\
-        </th>\
-        <th>\
-          Material\
-        </th>\
-        <th>\
-          Submitted\
-        </th>\
-        <th>\
-          Status\
-        </th>\
-        <th>\
-          Assigned staff\
-        </th>\
-        <th>\
-          Action\
-        </th>\
-      </tr>\
-    </thead>\
-    <tbody>\
-      ${jobs.map((job) => `<tr>\
-  <td>\
-    <a class="table-project" href="#/staff/jobs/${encodeURIComponent(job.id)}">\
-      <strong>\
-        ${moneylessId(job.id)}\
-      </strong>\
-      <span>\
-        ${esc(job.projectName)}\
-      </span>\
-    </a>\
-  </td>\
-  <td>\
-    ${esc(job.submitterName)}\
-    <small>\
-      ${esc(job.submitterEmail)}\
-    </small>\
-  </td>\
-  <td class="file-cell">\
-    ${esc(job.fileName)}\
-    <small>\
-      ${esc(job.fileSize)}\
-    </small>\
-  </td>\
-  <td>\
-    <span class="material-chip">\
-      ${esc(job.material)}\
-    </span>\
-  </td>\
-  <td>\
-    ${shortDate(job.submittedAt)}\
-    <small>\
-      ${new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(job.submittedAt))}\
-    </small>\
-  </td>\
-  <td>\
-    ${statusBadge(job.status)}\
-  </td>\
-  <td>\
-    ${job.assignedStaff ? `<span class="assigned">\
-  <i>\
-  </i>\
-  ${esc(job.assignedStaff)}\
-</span>` : `<span class="unassigned">\
-  Unassigned\
-</span>`}\
-  </td>\
-  <td>\
-    <a class="table-action ${job.status === "SUBMITTED" && !job.assignedStaff ? "action-highlight" : ""}" href="#/staff/jobs/${encodeURIComponent(job.id)}">\
-      ${job.status === "SUBMITTED" && !job.assignedStaff ? "Review" : "View"} \
-      <span>\
-        ↗\
-      </span>\
-    </a>\
-  </td>\
-</tr>`).join("")}\
-    </tbody>\
-  </table>\
+  return `<div class="table-wrap">
+  <table class="overview-job-table">
+    <thead>
+      <tr>
+        <th>Job / Project</th>
+        <th>Submitted by</th>
+        <th>File</th>
+        <th>Material</th>
+        <th>Submitted</th>
+        <th>Status</th>
+        <th>Assigned staff</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${jobs.map((job) => `<tr>
+  <td>
+    <a class="table-project" href="#/staff/jobs/${encodeURIComponent(job.id)}">
+      <strong>${moneylessId(job.id)}</strong>
+      <span>${esc(job.projectName)}</span>
+    </a>
+  </td>
+  <td>${esc(job.submitterName)}<small>${esc(job.submitterEmail)}</small></td>
+  <td class="file-cell">${esc(job.fileName)}<small>${esc(job.fileSize)}</small></td>
+  <td><span class="material-chip">${esc(job.material)}</span></td>
+  <td>${shortDate(job.submittedAt)}<small>${new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(job.submittedAt))}</small></td>
+  <td>${statusBadge(job.status)}</td>
+  <td>${job.assignedStaff ? `<span class="assigned"><i></i>${esc(job.assignedStaff)}</span>` : `<span class="unassigned">Unassigned</span>`}</td>
+  <td><a class="table-action ${job.status === "SUBMITTED" && !job.assignedStaff ? "action-highlight" : ""}" href="#/staff/jobs/${encodeURIComponent(job.id)}">${job.status === "SUBMITTED" && !job.assignedStaff ? "Review" : "View"} <span>↗</span></a></td>
+</tr>`).join("")}
+    </tbody>
+  </table>
 </div>`;
 }
 
@@ -204,11 +142,9 @@ export async function staffOverview() {
       Keep the school print queue moving.\
     </p>\
   </div>\
-  <a class="button button-lime button-small" href="#/staff/queue">\
-    Open print queue \
-    <span>\
-      →\
-    </span>\
+  <a class="button button-lime button-small" href="#/staff/active">\
+    My active jobs \
+    <span>→</span>\
   </a>\
 </div>\
 <section class="metric-grid">\
@@ -232,16 +168,10 @@ export async function staffOverview() {
 <section class="staff-section">\
   <div class="staff-section-head">\
     <div>\
-      <h2>\
-        Recent jobs\
-      </h2>\
-      <p>\
-        Latest activity across all demo requests\
-      </p>\
+      <h2>Recent jobs</h2>\
+      <p>Latest activity across all demo requests</p>\
     </div>\
-    <a class="text-link" href="#/staff/queue">\
-      View all jobs ↗\
-    </a>\
+    <a class="text-link" href="#/staff/active">View my active jobs ↗</a>\
   </div>\
   ${jobTable(jobs.slice(0, 6))}\
 </section>\
@@ -253,99 +183,6 @@ export async function staffOverview() {
     All records and actions in this workspace are local demo data. No printer is controlled and no message is sent.\
   </p>\
 </div>`, "overview");
-}
-
-export async function staffQueue(queueState) {
-  const jobs = await jobsService.listJobs(queueState);
-  const materialOptions = ["ALL", ...MATERIALS.map(({ id }) => id)];
-  return staffShell(`<div class="staff-page-heading">\
-  <div>\
-    <span class="eyebrow">\
-      STAFF PORTAL / JOBS\
-    </span>\
-    <h1>\
-      Print queue\
-    </h1>\
-    <p>\
-      Review requests and see where each demo job stands.\
-    </p>\
-  </div>\
-  <a class="button button-lime button-small" href="#/get-started">\
-    New print job \
-    <span>\
-      ＋\
-    </span>\
-  </a>\
-</div>\
-<div class="queue-summary">\
-  <span>\
-    <strong>\
-      ${jobs.length}\
-    </strong>\
-     jobs shown\
-  </span>\
-  <span>\
-    ${(await jobsService.summary()).total} total demo records\
-  </span>\
-  <span class="legend-dot">\
-  </span>\
-  <span>\
-    Updated locally\
-  </span>\
-</div>\
-<div class="queue-tools">\
-  <label class="search-box">\
-    <span>\
-      ⌕\
-    </span>\
-    <input type="search" placeholder="Search by job ID or project" value="${esc(queueState.search)}" data-filter="search" aria-label="Search by job ID or project" />\
-  </label>\
-  <label class="filter-select">\
-    <span class="sr-only">\
-      Filter by status\
-    </span>\
-    <select data-filter="status">\
-      ${["ALL", ...STATUSES].map((value) => `<option value="${value}" ${value === queueState.status ? "selected" : ""}>\
-  ${value === "ALL" ? "All statuses" : value.replace("_", " ")}\
-</option>`).join("")}\
-    </select>\
-  </label>\
-  <label class="filter-select">\
-    <span class="sr-only">\
-      Filter by material\
-    </span>\
-    <select data-filter="material">\
-      ${materialOptions.map((value) => `<option value="${value}" ${value === queueState.material ? "selected" : ""}>\
-  ${value === "ALL" ? "All materials" : value}\
-</option>`).join("")}\
-    </select>\
-  </label>\
-  <label class="filter-select">\
-    <span class="sr-only">\
-      Sort jobs\
-    </span>\
-    <select data-filter="sort">\
-      <option value="newest" ${queueState.sort === "newest" ? "selected" : ""}>\
-        Newest first\
-      </option>\
-      <option value="oldest" ${queueState.sort === "oldest" ? "selected" : ""}>\
-        Oldest first\
-      </option>\
-      <option value="project" ${queueState.sort === "project" ? "selected" : ""}>\
-        Project name\
-      </option>\
-    </select>\
-  </label>\
-</div>\
-${jobTable(jobs)}\
-<div class="table-foot">\
-  <span>\
-    Showing ${jobs.length} of ${(await jobsService.summary()).total} jobs\
-  </span>\
-  <span>\
-    Material availability depends on current school inventory.\
-  </span>\
-</div>`, "queue");
 }
 
 export async function activeJobsPage() {
@@ -403,66 +240,71 @@ ${jobs.length ? `<div class="active-jobs-grid">\
     No active jobs assigned\
   </h2>\
   <p>\
-    Claim an unassigned request from the print queue to see it here.\
+    Open an unassigned request from Overview to claim it.\
   </p>\
-  <a class="button button-lime" href="#/staff/queue">\
-    Browse print queue\
+  <a class="button button-lime" href="#/staff">\
+    Open Overview\
   </a>\
 </div>`}`, "active");
 }
 
 export async function staffMaterials() {
   const inventory = await inventoryService.listInventory();
-  const statusCounts = inventory.reduce((counts, item) => {
+  const entries = inventory.length ? `<div class="inventory-list" role="list">${inventory.map((item) => {
     const status = inventoryService.status(item);
-    counts[status] = (counts[status] || 0) + 1;
-    return counts;
-  }, {});
-  const availableCount = inventory.filter((item) => item.available && Number(item.quantity) > 0).length;
-  const entries = inventory.length ? `<div class="inventory-records">${inventory.map((item) => {
-    const status = inventoryService.status(item);
-    const latest = item.adjustments?.[0];
-    return `<article class="inventory-record">
-  <div class="inventory-record-head"><div><span class="eyebrow">FILAMENT ENTRY</span><h2>${esc(item.material)} · ${esc(item.color)}</h2></div><span class="inventory-status status-${status.toLowerCase().replaceAll(" ", "-")}">${esc(status)}</span></div>
-  <form class="inventory-edit-form" data-form="inventory-update" data-id="${esc(item.id)}">
-    <div class="inventory-edit-grid">
-      <label class="field"><span>Material</span><select name="material" required>${MATERIALS.map((material) => `<option value="${esc(material.id)}" ${material.id === item.material ? "selected" : ""}>${esc(material.name)}</option>`).join("")}</select></label>
-      <label class="field"><span>Color name</span><input name="color" type="text" maxlength="60" value="${esc(item.color)}" required /></label>
-      <label class="field"><span>Stock quantity</span><input name="quantity" type="number" min="0" step="0.01" value="${Number(item.quantity)}" required /></label>
-      <label class="field"><span>Unit</span><select name="unit" data-inventory-unit required>${[["g", "Grams (g)"], ["kg", "Kilograms (kg)"], ["spools", "Spools"]].map(([value, label]) => `<option value="${value}" ${value === item.unit ? "selected" : ""}>${label}</option>`).join("")}</select></label>
-      <label class="field"><span>Low-stock alert at (selected unit)</span><input name="lowStockThreshold" type="number" min="0" step="0.01" value="${Number(item.lowStockThreshold || 0)}" required /></label>
-      <label class="field"><span>Available to students?</span><select name="available"><option value="true" ${item.available ? "selected" : ""}>Yes</option><option value="false" ${!item.available ? "selected" : ""}>No</option></select></label>
-      <label class="field inventory-notes-field"><span>Notes</span><input name="notes" type="text" maxlength="300" value="${esc(item.notes || "")}" placeholder="Optional notes" /></label>
-    </div>
-    <div class="inventory-edit-actions"><span>Updated ${item.updatedAt ? dateTime(item.updatedAt) : "—"}</span><button class="button button-outline button-small" type="submit">Save entry</button></div>
-  </form>
-  <form class="stock-adjust-form" data-form="inventory-adjust" data-id="${esc(item.id)}">
-    <strong>Receive or consume stock</strong>
-    <label><span class="sr-only">Adjustment type</span><select name="action" aria-label="Adjustment type"><option value="receive">Receive stock</option><option value="consume">Record consumption</option></select></label>
-    <label><span class="sr-only">Adjustment amount</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="Amount" required aria-label="Stock adjustment amount" /></label>
-    <label class="adjust-note"><span class="sr-only">Adjustment note</span><input name="note" type="text" maxlength="120" placeholder="Optional note" aria-label="Stock adjustment note" /></label>
-    <button class="button button-lime button-small" type="submit">Record adjustment</button>
-  </form>
-  ${latest ? `<p class="inventory-last-adjustment">Latest change: ${esc(latest.type)} ${Number(latest.delta) > 0 ? "+" : ""}${Number(latest.delta)} ${esc(item.unit)} · ${dateTime(latest.at)}${latest.note ? ` · ${esc(latest.note)}` : ""}</p>` : ""}
-</article>`;
+    return `<div class="inventory-list-row" role="listitem">
+  <div class="inventory-list-name"><a href="#/staff/materials/${encodeURIComponent(item.id)}">${esc(item.material)} · ${esc(item.color)}</a><small>Open filament details ↗</small></div>
+  <div class="inventory-list-stock"><small>Remaining stock</small><strong>${Number(item.quantity)} <span>${esc(item.unit)}</span></strong></div>
+  <span class="inventory-status status-${status.toLowerCase().replaceAll(" ", "-")}">${esc(status)}</span>
+</div>`;
   }).join("")}</div>` : `<div class="empty-state inventory-empty"><span>◇</span><h2>No filament inventory entries yet</h2><p>Add the stock that staff have verified. Starting inventory is empty so this demo does not assume quantities or colors.</p></div>`;
 
-  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / MATERIALS</span><h1>Materials</h1><p>Record verified filament stock and control which material/color choices students can request.</p></div><span class="demo-pill">LOCAL DEMO STORAGE</span></div>
-<div class="inventory-metrics"><article><strong>${inventory.length}</strong><span>registered colors</span></article><article><strong>${availableCount}</strong><span>available to students</span></article><article><strong>${statusCounts["Low stock"] || 0}</strong><span>low stock</span></article><article><strong>${(statusCounts["Out of stock"] || 0) + (statusCounts.Unavailable || 0)}</strong><span>out or unavailable</span></article></div>
-<div class="inventory-banner staff-inventory"><span>ⓘ</span><p><strong>One inventory controls the request form and public FAQ.</strong> Entries with zero stock or marked unavailable cannot be selected. Job submission checks stock again before saving; submitting a request does not deduct stock.</p></div>
-<section class="staff-section inventory-add-section"><div class="staff-section-head"><div><h2>Add a verified filament entry</h2><p>Material/color combinations are unique. Use the same unit for this entry and its stock adjustments.</p></div></div>
-<form class="inventory-add-form" data-form="inventory-add">
+  return staffShell(`<div class="staff-page-heading inventory-page-heading"><div><span class="eyebrow">STAFF PORTAL / MATERIALS</span><h1>Materials</h1><p>Current filament stock at a glance.</p><a class="button button-lime" href="#/staff/materials/new">Add New Filament <span>＋</span></a></div></div>
+<section class="staff-section inventory-list-section"><div class="staff-section-head"><div><h2>Current inventory</h2><p>${inventory.length} filament ${inventory.length === 1 ? "entry" : "entries"}</p></div></div>${entries}</section>`, "materials");
+}
+
+const inventoryStatusClass = (status) => `status-${status.toLowerCase().replaceAll(" ", "-")}`;
+
+export function staffMaterialForm() {
+  return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div>
+<div class="staff-page-heading"><div><span class="eyebrow">MATERIALS / NEW ENTRY</span><h1>Add New Filament</h1><p>Enter verified stock details for one material and color.</p></div></div>
+<section class="filament-panel filament-form-panel"><form class="inventory-add-form" data-form="inventory-add">
   <label class="field"><span>Material <b>*</b></span><select name="material" required><option value="">Choose material</option>${MATERIALS.map((material) => `<option value="${esc(material.id)}">${esc(material.name)} · ${esc(material.descriptor)}</option>`).join("")}</select></label>
   <label class="field"><span>Color name <b>*</b></span><input name="color" type="text" maxlength="60" placeholder="e.g. Matte black" required /></label>
   <label class="field"><span>Initial stock <b>*</b></span><input name="quantity" type="number" min="0" step="0.01" value="0" required /></label>
   <label class="field"><span>Unit <b>*</b></span><select name="unit" data-inventory-unit required><option value="g">Grams (g)</option><option value="kg">Kilograms (kg)</option><option value="spools">Spools</option></select></label>
-  <label class="field"><span>Low-stock threshold (selected unit)</span><input name="lowStockThreshold" type="number" min="0" step="0.01" value="100" required /><small>At or below this amount, the entry is flagged as low stock.</small></label>
+  <label class="field"><span>Low-stock threshold <b>*</b></span><input name="lowStockThreshold" type="number" min="0" step="0.01" value="100" required /><small>Uses the selected stock unit.</small></label>
   <label class="field"><span>Available to students?</span><select name="available"><option value="true" selected>Yes</option><option value="false">No</option></select></label>
   <label class="field inventory-add-notes"><span>Notes <em>(optional)</em></span><input name="notes" type="text" maxlength="300" placeholder="Supplier, finish, or storage note" /></label>
-  <button class="button button-lime" type="submit">Add inventory entry <span>＋</span></button>
-</form></section>
-<section class="staff-section inventory-list-section"><div class="staff-section-head"><div><h2>Current inventory</h2><p>Stock quantities, units, availability, and adjustments</p></div></div>${entries}</section>
-<div class="staff-note"><span>ⓘ</span><p>This demo saves changes in this browser's local storage. Its Staff Portal uses a mock identity and is not protected by server-side authorization.</p></div>`, "materials");
+  <div class="inventory-form-actions"><a class="button button-outline" href="#/staff/materials">Cancel</a><button class="button button-lime" type="submit">Save filament <span>＋</span></button></div>
+</form></section>`, "material-new");
+}
+
+export async function staffMaterialDetail(id) {
+  const item = await inventoryService.getItem(id);
+  if (!item) return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div><div class="empty-state"><span>◇</span><h2>Filament not found</h2><p>This inventory entry may have been removed or the link is invalid.</p><a class="button button-outline" href="#/staff/materials">Back to current inventory</a></div>`, "materials");
+  const status = inventoryService.status(item);
+  const adjustments = (item.adjustments || []).slice(0, 8);
+  const adjustmentRows = adjustments.length ? `<div class="filament-adjustment-list">${adjustments.map((entry) => `<div class="filament-adjustment-row"><span class="adjustment-mark ${Number(entry.delta) >= 0 ? "is-positive" : "is-negative"}" aria-hidden="true">${Number(entry.delta) > 0 ? "+" : Number(entry.delta) < 0 ? "−" : "•"}</span><div><strong>${esc(entry.type === "initial" ? "Initial stock" : entry.type === "set" ? "Stock updated" : entry.type === "receive" ? "Stock received" : "Stock consumed")}</strong><small>${dateTime(entry.at)}${entry.note ? ` · ${esc(entry.note)}` : ""}</small></div><b>${Number(entry.delta) > 0 ? "+" : ""}${Number(entry.delta)} ${esc(item.unit)}</b></div>`).join("")}</div>` : `<p class="filament-muted">No stock changes recorded yet.</p>`;
+  return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div>
+<div class="filament-detail-heading"><div><span class="eyebrow">MATERIALS / FILAMENT DETAILS</span><h1>${esc(item.material)} · ${esc(item.color)}</h1><span class="inventory-status ${inventoryStatusClass(status)}">${esc(status)}</span></div><div class="filament-current-stock"><small>Current stock</small><strong>${Number(item.quantity)} <span>${esc(item.unit)}</span></strong></div></div>
+<div class="filament-detail-grid">
+  <section class="filament-panel"><div class="filament-panel-heading"><div><h2>Filament settings</h2><p>Update identity, availability, and low-stock alert.</p></div></div>
+    <form class="inventory-edit-form" data-form="inventory-update" data-id="${esc(item.id)}"><div class="inventory-edit-grid">
+      <label class="field"><span>Material</span><select name="material" required>${MATERIALS.map((material) => `<option value="${esc(material.id)}" ${material.id === item.material ? "selected" : ""}>${esc(material.name)}</option>`).join("")}</select></label>
+      <label class="field"><span>Color name</span><input name="color" type="text" maxlength="60" value="${esc(item.color)}" required /></label>
+      <label class="field"><span>Stock quantity</span><input name="quantity" type="number" min="0" step="0.01" value="${Number(item.quantity)}" required /></label>
+      <label class="field"><span>Unit</span><select name="unit" data-inventory-unit required>${[["g", "Grams (g)"], ["kg", "Kilograms (kg)"], ["spools", "Spools"]].map(([value, label]) => `<option value="${value}" ${value === item.unit ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+      <label class="field"><span>Low-stock threshold</span><input name="lowStockThreshold" type="number" min="0" step="0.01" value="${Number(item.lowStockThreshold || 0)}" required /><small>Uses the selected stock unit.</small></label>
+      <label class="field"><span>Available to students?</span><select name="available"><option value="true" ${item.available ? "selected" : ""}>Yes</option><option value="false" ${!item.available ? "selected" : ""}>No</option></select></label>
+      <label class="field inventory-notes-field"><span>Notes</span><input name="notes" type="text" maxlength="300" value="${esc(item.notes || "")}" placeholder="Optional notes" /></label>
+    </div><div class="inventory-edit-actions"><span>Updated ${item.updatedAt ? dateTime(item.updatedAt) : "—"}</span><div><button class="button button-outline button-small" type="reset">Cancel</button><button class="button button-lime button-small" type="submit">Save changes</button></div></div></form>
+  </section>
+  <section class="filament-panel"><div class="filament-panel-heading"><div><h2>Receive or use stock</h2><p>Record a quantity change and keep its history with this filament.</p></div></div>
+    <form class="stock-adjust-form" data-form="inventory-adjust" data-id="${esc(item.id)}"><label class="field"><span>Adjustment</span><select name="action" aria-label="Adjustment type"><option value="receive">Receive stock</option><option value="consume">Record consumption</option></select></label><label class="field"><span>Amount (${esc(item.unit)})</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0" required aria-label="Stock adjustment amount" /></label><label class="field adjust-note"><span>Note <em>(optional)</em></span><input name="note" type="text" maxlength="120" placeholder="Reason for change" /></label><button class="button button-lime" type="submit">Record adjustment</button></form>
+    <div class="filament-adjustment-history"><h3>Recent stock activity</h3>${adjustmentRows}</div>
+  </section>
+</div>`, "materials");
 }
 
 const localDateValue = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -503,8 +345,8 @@ export async function jobDetailsPage(jobId) {
   <p>\
     This demo job may have been removed or the link is invalid.\
   </p>\
-  <a class="button button-outline" href="#/staff/queue">\
-    Back to print queue\
+  <a class="button button-outline" href="#/staff">\
+    Back to Overview\
   </a>\
 </div>`);
   const action = job.status === "SUBMITTED" && !job.assignedStaff ? `<button class="button button-lime" data-action="claim-job" data-id="${esc(job.id)}">\
@@ -552,8 +394,8 @@ export async function jobDetailsPage(jobId) {
 </div>`).join("")}\
 </section>` : "";
   return staffShell(`<div class="detail-back">\
-  <a href="#/staff/queue">\
-    ← Print queue\
+  <a href="#/staff">\
+    ← Overview\
   </a>\
   <span>\
     /\
@@ -677,5 +519,5 @@ export async function jobDetailsPage(jobId) {
       </p>\
     </div>\
   </aside>\
-</div>`, "queue");
+</div>`, "overview");
 }
