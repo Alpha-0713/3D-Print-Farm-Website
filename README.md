@@ -1,15 +1,15 @@
 
-# School 3D Print Farm Demo — v1.1.1
+# School 3D Print Farm Demo — v1.2
 
 **A responsive, frontend-only prototype for a school 3D-print request workflow.**
 
-![version](https://img.shields.io/badge/version-1.1.1-blue)
+![version](https://img.shields.io/badge/version-1.2-blue)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JS-f7df1e?logo=javascript&logoColor=black)
 ![backend](https://img.shields.io/badge/backend-none-lightgrey)
 ![storage](https://img.shields.io/badge/storage-localStorage-orange)
 ![status](https://img.shields.io/badge/status-demo%20only-red)
 
-[Quick start](#quick-start) · [Routes](#routes) · [What's new](#v111-release-summary) · [Limits](#data-backend-and-security-limits) · [Testing](#testing) · [Files](#project-structure)
+[Quick start](#quick-start) · [Routes](#routes) · [What's new](#v12-release-summary) · [Limits](#data-backend-and-security-limits) · [Testing](#testing) · [Files](#project-structure)
 
 ---
 
@@ -17,7 +17,7 @@
 >
 > This is a **demonstration only**. Do not use it with real student data, production requests, or stock control that needs shared or secured records.
 
-Version 1.1 simplifies the public homepage, adds browser-persistent filament inventory and student contribution records, and connects public material availability to the same inventory used by the request form. Version 1.1.1 adds interactive 3D model previews and direct HTTPS model URL support.
+Version 1.2 restores the established Staff Overview with four job metrics and the six newest requests, removes the retired queue page from staff navigation, and streamlines the request wizard by removing layer-height and infill options. The Materials workspace supports adding, editing, and adjusting filament stock. Earlier releases added the public FAQ, student contribution records, and interactive 3D model previews.
 
 ## Quick start
 
@@ -49,9 +49,13 @@ An internet connection is required to load the pinned Three.js and fflate previe
 
 Legacy links to `#/staff/queue` redirect to the Staff Overview.
 
-## v1.1.1 release summary
+## v1.2 release summary
 
-The public home page removes the requested header FAQ link, tagline, promotional line, and brand eyebrow. The remaining hero content fills the page without the removed stats row.
+The current staff navigation includes Overview, My active jobs, Materials, and My Hours. Older `#/staff/queue` links redirect to the Staff Overview. The Overview presents counts for unclaimed, in-progress, printing, and completed-today jobs, followed by the six most recently submitted requests. The request wizard does not ask students to choose layer height or infill.
+
+### Previous release details (v1.1.1)
+
+In v1.1.1, the public home page removed the header FAQ link, tagline, promotional line, and brand eyebrow. The remaining hero content fills the page without the removed stats row.
 
 The Get Started form accepts STL, 3MF, and OBJ files up to 25 MB. It previews the selected model geometry in an interactive Three.js viewport with orbit, zoom, and pan controls. The file is parsed in the browser and only filename and size metadata enter the local demo request; model bytes are not uploaded or saved. Replacing or removing a model disposes the prior preview.
 
@@ -65,7 +69,7 @@ The homepage no longer includes the `01 / Capabilities`, `02 / Material Intellig
 
 It keeps the **hero**, **use cases**, **FAQ**, and **request call to action**. Job submission and tracking remain available.
 
-The **Good questions** FAQ explains what filament is and compares the supported materials (**PLA**, **PETG**, **TPU**) by typical uses, behavior, and printing considerations. Its color and stock status list comes from the same inventory used by the request form.
+The **FAQ** explains what filament is and compares the supported materials (**PLA**, **PETG**, **TPU**) by typical uses, behavior, and printing considerations. Its color and stock status list comes from the same inventory used by the request form.
 
 > [!NOTE]
 >
