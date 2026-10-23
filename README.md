@@ -1,4 +1,4 @@
-# School 3D Print Farm Demo — v1.1
+# School 3D Print Farm Demo — v1.1.1
 
 A responsive, frontend-only prototype for a school 3D-print request workflow. Version 1.1 simplifies the public homepage, adds browser-persistent filament inventory and student contribution records, and connects public material availability to the same inventory used by the request form.
 
@@ -10,7 +10,7 @@ Requires Python 3. From this directory, run:
 python3 -m http.server 8000
 ```
 
-Open [http://localhost:8000](http://localhost:8000). Stop the server with `Control-C`. The app has no build step or external dependencies.
+Open [http://localhost:8000](http://localhost:8000). Stop the server with `Control-C`. The app has no build step. An internet connection is required to load the pinned Three.js and fflate preview modules from jsDelivr.
 
 ## Routes
 
@@ -26,6 +26,16 @@ Open [http://localhost:8000](http://localhost:8000). Stop the server with `Contr
 | `#/staff/hours` | Student contribution hours |
 | `#/staff/jobs/:id` | Job details and status actions |
 | `#/section/faq` | Public FAQ anchor |
+
+## v1.1.1 release summary
+
+The public home page removes the requested header FAQ link, tagline, promotional line, and brand eyebrow. The remaining hero content fills the page without the removed stats row.
+
+The Get Started form accepts STL, 3MF, and OBJ files up to 25 MB. It previews the selected model geometry in an interactive Three.js viewport with orbit, zoom, and pan controls. The file is parsed in the browser and only filename and size metadata enter the local demo request; model bytes are not uploaded or saved. Replacing or removing a model disposes the prior preview.
+
+Users can also provide a direct HTTPS model URL. The browser retrieves the file without credentials, enforces the same 25 MB limit, then passes the bytes through the same validation and preview flow. The source must allow cross-origin browser access (CORS); authenticated pages, indirect links, or servers that block CORS are reported as unavailable. There is no backend proxy. The 3MF loader uses fflate 0.8.3 for ZIP parsing.
+
+Three.js 0.186.0 and fflate 0.8.3 are pinned CDN dependencies. The app is still static and has no build step or server-side storage.
 
 ## v1.1 release summary
 
@@ -53,7 +63,7 @@ This project has no student directory. Contribution records use entered student 
 
 ## Data, backend, and security limits
 
-This repository is a static frontend demo. It contains no backend server, API routes, database configuration, database models, or database initialization procedure. `src/apiClient.js` is an inactive integration placeholder and makes no requests. There are no new environment variables, database migrations, or external dependencies in v1.1.
+This repository is a static frontend demo. It contains no backend server, API routes, database configuration, database models, or database initialization procedure. `src/apiClient.js` is an inactive integration placeholder and makes no requests. There are no new environment variables or database migrations. The 3D viewport loads pinned Three.js 0.186.0 modules and fflate 0.8.3 from jsDelivr; a browser with network access is needed for preview parsing.
 
 Jobs, notifications, inventory, and contribution records are saved in the browser's `localStorage` under `three-d-print-farm-demo-v3`. The existing job data is retained; older saved data is extended with empty `inventory` and `contributions` arrays when first read. Changes persist after reload in the same browser and origin, but are not shared across browsers, devices, or users. Browser storage can be cleared by the user or unavailable due to browser settings.
 
@@ -80,12 +90,19 @@ Then use the routes above to inspect the public site and staff workflows.
 - Added and edited a contribution record with decimal hours, checked student/date filtering and totals, and confirmed the saved record remained after reloading the isolated preview.
 - Inspected browser console output during these workflows; no console errors or warnings were reported.
 
-This repository has no automated test suite or package manifest. A standalone JavaScript syntax-check command could not be run because Node.js is not installed in the environment. The browser loaded and exercised the app modules through the static server. A real backend workflow, authenticated staff access, cross-device persistence, and actual printer/file uploads are not available to verify in this project.
+### Browser verification performed for v1.1.1
+
+- Checked the updated homepage navigation and request wizard in a narrow browser viewport. The desktop header FAQ link and requested promotional copy are removed; FAQ content remains available through the existing footer route.
+- Loaded the official Three.js 3MF sample from a direct HTTPS URL, confirmed the geometry appeared in the preview, and dragged the viewport to orbit the model. An HTTP URL was rejected and the previous preview was cleared.
+- Exercised the same parser and preview module with browser-created STL, OBJ, and 3MF `File` objects, including uppercase extensions. Confirmed replacement disposes the prior preview, and malformed models plus empty, unsupported, oversized, and non-HTTPS inputs are rejected.
+- The native operating-system file chooser was not manually operated; local file parsing and rendering were covered through browser `File` objects.
+
+The project has no package manifest, automated test suite, build, lint, or type-check scripts. Node.js is unavailable in the environment, so no JavaScript build or command-line checks were run. Verification used the static HTTP server and browser. Direct-link loading depends on the host providing a downloadable file and permissive CORS headers; authenticated or private links cannot be fetched by this frontend-only demo. A production backend, real file storage, and printer workflow remain unavailable.
 
 ## Existing demo behavior and limits
 
 - Student and staff identities are fictional; authentication and role-based access are not implemented.
-- The wizard accepts `.stl` and `.3mf` filenames up to 25 MB. It keeps only the filename and size as metadata; it does not read or upload model contents.
+- The wizard accepts `.stl`, `.3mf`, and `.obj` files up to 25 MB, parses their geometry for the preview, and keeps only filename and size as job metadata. It does not upload model contents.
 - Notifications are simulated locally. No email is sent.
 - Job status changes are simulated in the browser. The app does not connect to or control a 3D printer.
 - The supported demo materials are PLA, PETG, and TPU. Colors and quantities are staff-entered local data and begin empty.
@@ -103,7 +120,8 @@ This project is for demonstration only and should not be used with real student 
 - `src/data.js` — demo identities, supported material descriptions, seed jobs, and notification data.
 - `src/services.js` — local job, inventory, and contribution data; validation, transitions, and draft persistence.
 - `src/authService.js` — mock identity interface.
-- `src/filesService.js` — model filename and size metadata handling.
+- `src/filesService.js` — model filename, size, extension, and HTTPS URL validation.
+- `src/modelPreview.js` — Three.js model parsing, interactive preview, and renderer cleanup.
 - `src/notificationsService.js` — simulated notification state.
 - `src/apiClient.js` — inactive API configuration placeholder; makes no network requests.
 - `src/styles.css` — visual styles and responsive behavior.
