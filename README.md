@@ -105,9 +105,7 @@ The project has no package manifest, automated test suite, build, lint, or type-
 - The wizard accepts `.stl`, `.3mf`, and `.obj` files up to 25 MB, parses their geometry for the preview, and keeps only filename and size as job metadata. It does not upload model contents.
 - Notifications are simulated locally. No email is sent.
 - Job status changes are simulated in the browser. The app does not connect to or control a 3D printer.
-- The supported demo materials are PLA, PETG, and TPU. Colors and quantities are staff-entered local data and begin empty.
-
-This project is for demonstration only and should not be used with real student data or production requests.
+- The supported demo materials are PLA, PETG, and TPU. Colors and quantities are staff-entered local data and begin empty. 
 
 ## Files
 
