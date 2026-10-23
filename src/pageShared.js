@@ -57,10 +57,6 @@ export function footer() {
     ${logo()}\
     <div class="footer-links">\
       <div>\
-        <span class="eyebrow">Explore</span>\
-        <a href="#/section/faq">Good questions</a>\
-      </div>\
-      <div>\
         <span class="eyebrow">Get started</span>\
         <a href="#/get-started">Submit a print request</a>\
         <a href="#/my-jobs">My Jobs</a>\
