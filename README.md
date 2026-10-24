@@ -13,7 +13,7 @@
 
 v1.5 Beta adds staff hours management to the Staff Dashboard. Level 2 and Level 3 staff use **Hours** to view their own balance and history and submit adjustment requests. Level 4 staff use one combined **Hours** page to manage Level 2 and Level 3 balances, review requests, and view hours and student contribution activity together. Level 4 staff do not have a personal hours balance.
 
-The application remains a static HTML, CSS, and vanilla JavaScript demo. Roles and shared demo data are stored in the current browser. It does not authenticate users or provide trusted server-side authorization, a database, or shared multi-device persistence.
+Also enjoy the new Overview page :)
 
 ## Quick start
 
@@ -116,10 +116,6 @@ The repository has no backend, database, Google authentication, email delivery, 
     ├── apiClient.js              # Inactive API placeholder
     └── styles.css                # Components and responsive layout
 ~~~
-
-## Verification
-
-The repository has no automated test suite, package manifest, build, lint, or type-check configuration. For a manual review, run the quick-start server and switch among the built-in and newly created demo identities. Confirm both Level 2 and Level 3 profiles only see their own Hours balance, history, and request form; Level 4 sees the combined page without a personal balance. Give hours to an existing Level 2 or Level 3 profile and confirm its balance and personal history update, then review the linked activity once in Level 4's combined history. Review a request as Level 4, refresh to confirm saved history and status, and check that deductions cannot create a negative balance. These browser-side checks do not replace backend authorization or shared accounting.
 
 ---
 
