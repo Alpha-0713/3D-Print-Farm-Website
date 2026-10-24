@@ -1,8 +1,8 @@
-import { MATERIALS } from "./data.js?v=14";
-import { esc, footer, publicHeader } from "./pageShared.js?v=14";
-import { PERMISSION_LABELS } from "./authorization.js?v=14";
-import { authService } from "./authService.js?v=14";
-import { partArtwork } from "./visualComponents.js?v=14";
+import { MATERIALS } from "./data.js?v=19";
+import { esc, footer, publicHeader } from "./pageShared.js?v=19";
+import { PERMISSION_LABELS } from "./authorization.js?v=19";
+import { authService } from "./authService.js?v=19";
+import { partArtwork } from "./visualComponents.js?v=19";
 
 const safeSwatch = (hexColor) => (/^#[\da-f]{6}$/i.test(hexColor || "") ? hexColor : "#2b2b2b");
 

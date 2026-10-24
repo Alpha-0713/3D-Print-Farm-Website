@@ -1,6 +1,6 @@
-import { MATERIALS } from "./data.js?v=14";
-import { inventoryService } from "./services.js?v=14";
-import { esc, footer, moneylessId, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=14";
+import { MATERIALS } from "./data.js?v=19";
+import { inventoryService } from "./services.js?v=19";
+import { esc, footer, printNumber, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=19";
 
 function stepIndicator(active) {
   const steps = [[1, "Upload model"], [2, "Print settings"], [3, "Project details"], [4, "Review & submit"]];
@@ -98,7 +98,7 @@ function wizardPanel(state, availableFilaments) {
       DEMO JOB ID\
     </span>\
     <strong>\
-      ${moneylessId(w.submittedJob.id)}\
+      ${printNumber(w.submittedJob.id)}\
     </strong>\
     <span>\
       Submitted ${dateTime(w.submittedJob.submittedAt)}\

@@ -1,21 +1,21 @@
-import { contributionsService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=14";
-import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=14";
-import { notificationsService } from "./notificationsService.js?v=14";
-import { dateTime, esc, moneylessId } from "./pageShared.js?v=14";
-import { accessDeniedPage, homePage } from "./publicPages.js?v=14";
-import { authService, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=14";
-import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=14";
-import { getStartedPage } from "./requestWizard.js?v=14";
-import { myJobsPage } from "./studentPages.js?v=14";
+import { contributionsService, hoursService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=19";
+import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=19";
+import { notificationsService } from "./notificationsService.js?v=19";
+import { dateTime, esc, printNumber } from "./pageShared.js?v=19";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=19";
+import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=19";
+import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=19";
+import { getStartedPage } from "./requestWizard.js?v=19";
+import { myJobsPage } from "./studentPages.js?v=19";
 import {
   activeJobsPage,
   jobDetailsPage,
-  staffHours,
   staffMaterialDetail,
   staffMaterialForm,
   staffMaterials,
   staffOverview,
-} from "./staffPages.js?v=14";
+} from "./staffPages.js?v=19";
+import { staffHours } from "./hoursPages.js?v=19";
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
@@ -24,6 +24,7 @@ const state = {
   menuOpen: false,
   hoursFilters: { student: "", from: "", to: "" },
   hoursEditingId: "",
+  hoursStaffSearch: "",
   wizard: {
     step: 1,
     file: null,
@@ -132,7 +133,10 @@ function parseRoute() {
   if (value === "/staff/queue") return { page: "staff", redirect: true };
   if (value === "/staff/active") return { page: "active" };
   if (value === "/staff/materials") return { page: "materials" };
+  const hoursStaff = value.match(/^\/staff\/hours\/staff\/([^/?#]+)$/);
+  if (hoursStaff) return { page: "hours", staffId: decodeRouteId(hoursStaff[1]) };
   if (value === "/staff/hours") return { page: "hours" };
+  if (value === "/staff/contributions") return { page: "hours", legacyContributionsRoute: true };
 
   return { page: "home" };
 }
@@ -145,9 +149,11 @@ async function render() {
     location.hash = "#/staff";
     return;
   }
-  const requiredPermission = ROUTE_PERMISSIONS[route.page];
+  const requiredPermission = route.page === "hours" && (route.staffId || authService.can(PERMISSIONS.HOURS_ADMIN))
+    ? PERMISSIONS.HOURS_ADMIN
+    : ROUTE_PERMISSIONS[route.page];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    document.title = "Access restricted · 3D Print Farm · v1.4 Beta";
+    document.title = "Access restricted · 3D Print Farm · v1.5 Beta";
     app.innerHTML = accessDeniedPage(state, requiredPermission);
     window.scrollTo({ top: 0, behavior: "auto" });
     return;
@@ -155,13 +161,13 @@ async function render() {
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v1.4-beta · Version 1.4 Beta";
+    document.title = "Staff Portal · School 3D Print Farm — v1.5-beta · Version 1.5 Beta";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v1.4-beta · Version 1.4 Beta";
+    document.title = "Get Started · School 3D Print Farm — v1.5-beta · Version 1.5 Beta";
   } else if (route.page === "my-jobs") {
-    document.title = "My Jobs · School 3D Print Farm — v1.4-beta · Version 1.4 Beta";
+    document.title = "My Jobs · School 3D Print Farm — v1.5-beta · Version 1.5 Beta";
   } else {
-    document.title = "School 3D Print Farm Website — v1.4-beta · Version 1.4 Beta";
+    document.title = "School 3D Print Farm Website — v1.5-beta · Version 1.5 Beta";
   }
 
   if (route.page === "home") {
@@ -181,7 +187,7 @@ async function render() {
   } else if (route.page === "filament") {
     app.innerHTML = await staffMaterialDetail(route.id);
   } else if (route.page === "hours") {
-    app.innerHTML = await staffHours(state.hoursFilters, state.hoursEditingId);
+    app.innerHTML = await staffHours({ staffId: route.staffId || "", search: state.hoursStaffSearch });
   } else if (route.page === "job") {
     app.innerHTML = await jobDetailsPage(route.id);
   }
@@ -190,7 +196,7 @@ async function render() {
     const selectedFile = state.wizard.modelFile;
     const stage = document.querySelector("#model-preview");
     try {
-      modelPreviewModule ||= await import("./modelPreview.js?v=14");
+      modelPreviewModule ||= await import("./modelPreview.js?v=19");
       if (revision !== renderRevision || selectedFile !== state.wizard.modelFile || !stage?.isConnected) return;
       await modelPreviewModule.mountModelPreview(stage, selectedFile, (status, message = "") => {
         if (revision !== renderRevision || selectedFile !== state.wizard.modelFile) return;
@@ -411,7 +417,7 @@ function openCompletionDialog(job) {
     </button>\
   </div>\
   <p class="dialog-job">\
-    ${moneylessId(job.id)} · ${esc(job.projectName)}\
+    ${printNumber(job.id)} · ${esc(job.projectName)}\
   </p>\
   <label class="field">\
     <span>\
@@ -545,7 +551,7 @@ async function doAction(action, target) {
   try {
     if (action === "switch-role") {
       target.closest(".role-switcher")?.removeAttribute("open");
-      if (!authService.switchRole(target.dataset.roleId)) throw new Error("That demonstration identity is unavailable.");
+      if (!authService.switchRole(target.dataset.identityId)) throw new Error("That demonstration identity is unavailable.");
       await render();
     } else if (action === "set-accent") {
       if (ACCENT_IDS.has(target.dataset.accent)) {
@@ -581,6 +587,19 @@ async function doAction(action, target) {
       await render();
     } else if (action === "hours-clear-filters") {
       state.hoursFilters = { student: "", from: "", to: "" };
+      await render();
+    } else if (action === "hours-approve") {
+      const detail = `${target.dataset.type || "hour adjustment"} of ${target.dataset.hours || ""}`.trim();
+      if (!window.confirm(`Approve ${detail} for ${target.dataset.name || "this staff member"}? This will update the balance and permanently record a transaction.`)) return;
+      await hoursService.approveRequest(id);
+      toast("Request approved and the hour adjustment was recorded.");
+      await render();
+    } else if (action === "hours-reject") {
+      const rejectionReason = window.prompt("Optional reason for rejecting this request:", "");
+      if (rejectionReason === null) return;
+      if (!window.confirm(`Reject ${target.dataset.name || "this staff member"}'s request for ${target.dataset.hours || "the requested hours"}? The balance will not change.`)) return;
+      await hoursService.rejectRequest(id, rejectionReason);
+      toast("Request rejected. The staff member can now see the decision.");
       await render();
     } else if (action === "close-dialog") {
       const dialog = document.querySelector("#completion-dialog");
@@ -683,8 +702,8 @@ async function doAction(action, target) {
       state.menuOpen = !state.menuOpen;
       await render();
     } else if (action === "copy-job") {
-      await navigator.clipboard?.writeText(id);
-      toast("Job ID copied.");
+      await navigator.clipboard?.writeText(printNumber(id));
+      toast("Print number copied.");
     }
   } catch (error) {
     toast(error.message || "The action could not be completed.", "error");
@@ -729,14 +748,27 @@ app.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (action === "hours-admin-filter") {
+    state.hoursStaffSearch = String(values.search || "").trim();
+    await render();
+    return;
+  }
+
   if (form.dataset.saving === "true") return;
   form.dataset.saving = "true";
   const submitButton = form.querySelector('[type="submit"]');
   if (submitButton) submitButton.disabled = true;
 
   try {
-    if (action === "job-reassign") {
-      const job = await jobsService.reassignJob(form.dataset.id, values.assigneeRoleId);
+    if (action === "create-demo-account") {
+      const account = authService.createDemoAccount(values);
+      if (!authService.switchRole(account.id)) throw new Error("The new demo account could not be selected.");
+      if (location.hash !== "#/") location.hash = "#/";
+      await render();
+      const role = authService.getCurrentRole();
+      toast(`${account.name} demo account created · Level ${role.level}.`);
+    } else if (action === "job-reassign") {
+      const job = await jobsService.reassignJob(form.dataset.id, values.assigneeId);
       await render();
       toast("Job reassigned to " + job.assignedStaff + ".");
     } else if (action === "inventory-add") {
@@ -761,6 +793,48 @@ app.addEventListener("submit", async (event) => {
       state.hoursEditingId = "";
       await render();
       toast("Contribution record updated.");
+    } else if (action === "hours-request") {
+      await hoursService.submitRequest(values);
+      await render();
+      toast("Adjustment request submitted for Level 4 review. Your balance has not changed.");
+    } else if (action === "hours-admin-adjust") {
+      const amountCenti = Math.round(Number(values.hours) * 100);
+      const beforeCenti = Number(form.dataset.balanceCenti);
+      const deltaCenti = values.adjustmentType === "add" ? amountCenti : -amountCenti;
+      const afterCenti = beforeCenti + deltaCenti;
+      const adjustmentVerb = values.adjustmentType === "add" ? "add" : "subtract";
+      if (!Number.isSafeInteger(amountCenti) || amountCenti <= 0 || !Number.isSafeInteger(afterCenti) || afterCenti < 0) {
+        form.dataset.saving = "false";
+        if (submitButton) submitButton.disabled = false;
+        toast("Enter a valid positive amount that will keep the balance at zero or above.", "error");
+        return;
+      }
+      if (!window.confirm(`Confirm ${adjustmentVerb}ing ${values.hours} hour(s) for this staff member? Balance: ${(beforeCenti / 100).toFixed(2)} → ${(afterCenti / 100).toFixed(2)} hours. Reason: ${String(values.reason || "").trim()}`)) {
+        form.dataset.saving = "false";
+        if (submitButton) submitButton.disabled = false;
+        return;
+      }
+      await hoursService.adjustStaffHours(form.dataset.userId, values);
+      await render();
+      toast("Hours corrected and saved to the transaction history.");
+    } else if (action === "hours-admin-give") {
+      const amountCenti = Math.round(Number(values.hours) * 100);
+      const beforeCenti = Number(form.dataset.balanceCenti);
+      const afterCenti = beforeCenti + amountCenti;
+      if (!Number.isSafeInteger(amountCenti) || amountCenti <= 0 || amountCenti > 2400 || !Number.isSafeInteger(afterCenti)) {
+        form.dataset.saving = "false";
+        if (submitButton) submitButton.disabled = false;
+        toast("Enter an amount from 0.01 to 24 hours.", "error");
+        return;
+      }
+      if (!window.confirm(`Give ${values.hours} hour(s) to ${form.dataset.userName}? Balance: ${(beforeCenti / 100).toFixed(2)} → ${(afterCenti / 100).toFixed(2)} hours. Activity: ${String(values.activity || "").trim()}`)) {
+        form.dataset.saving = "false";
+        if (submitButton) submitButton.disabled = false;
+        return;
+      }
+      await hoursService.giveHours(form.dataset.userId, values);
+      await render();
+      toast("Hours given and added to the staff member’s contribution and transaction history.");
     }
   } catch (error) {
     form.dataset.saving = "false";
@@ -769,8 +843,30 @@ app.addEventListener("submit", async (event) => {
   }
 });
 
+function updateHoursPreview(form) {
+  if (!form?.matches(".hours-admin-adjust-form, .hours-admin-give-form")) return;
+  const input = form.elements.hours;
+  const amount = String(input?.value || "").trim();
+  const preview = form.querySelector("[data-hours-proposed]");
+  const beforeCenti = Number(form.dataset.balanceCenti);
+  const amountIsValid = /^\d+(?:\.\d{1,2})?$/.test(amount) && Number(amount) > 0;
+  if (!preview) return;
+  if (!amountIsValid || !Number.isFinite(beforeCenti)) {
+    preview.textContent = "Enter a valid amount";
+    preview.closest("span")?.classList.remove("is-negative");
+    return;
+  }
+  const amountCenti = Math.round(Number(amount) * 100);
+  const isGivingHours = form.matches(".hours-admin-give-form");
+  const afterCenti = beforeCenti + (isGivingHours ? amountCenti : -amountCenti);
+  preview.textContent = `${(afterCenti / 100).toFixed(2).replace(/\.00$/, "")} h`;
+  preview.closest("span")?.classList.toggle("is-negative", afterCenti < 0);
+}
+
 app.addEventListener("input", (event) => {
   const target = event.target;
+
+  if (target.matches("[data-hours-preview-input]")) updateHoursPreview(target.form);
 
   if (target.matches("[data-hex-input]")) {
     const preview = target.form?.querySelector("[data-rgb-preview]");
@@ -794,6 +890,8 @@ app.addEventListener("input", (event) => {
 
 app.addEventListener("change", async (event) => {
   const target = event.target;
+
+  if (target.matches("[data-hours-preview-input]")) updateHoursPreview(target.form);
 
   if (target.matches("#model-file")) {
     void setFile(target.files?.[0]);
@@ -843,6 +941,10 @@ window.addEventListener("hashchange", () => {
 
 window.addEventListener("storage", async (event) => {
   if (event.key === DEMO_ROLE_STORAGE_KEY) {
+    await render();
+    return;
+  }
+  if (event.key === DEMO_ACCOUNTS_STORAGE_KEY) {
     await render();
     return;
   }

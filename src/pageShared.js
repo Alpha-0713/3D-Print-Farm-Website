@@ -1,5 +1,5 @@
-import { authService } from "./authService.js?v=14";
-import { PERMISSIONS, ROLES } from "./authorization.js?v=14";
+import { authService } from "./authService.js?v=19";
+import { PERMISSIONS, ROLES } from "./authorization.js?v=19";
 
 export const esc = (value = "") => String(value).replace(/[&<>"\x27]/g, (char) => ({
   "&": "&amp;",
@@ -21,7 +21,10 @@ export const dateTime = (value) => new Intl.DateTimeFormat("en", {
   minute: "2-digit",
 }).format(new Date(value));
 
-export const moneylessId = (id) => esc(id);
+export const printNumber = (id) => {
+  const suffix = String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(-4).padStart(4, "0");
+  return `PFN-${esc(suffix)}`;
+};
 
 export function logo() {
   return `<a class="brand" href="#/" aria-label="3D Print Farm home">\
@@ -54,13 +57,17 @@ export function roleSwitcher() {
   const role = ROLES[identity.roleId];
   const choices = authService.getDemoIdentities().map((choice) => {
     const choiceRole = ROLES[choice.roleId];
-    const active = choice.roleId === identity.roleId;
-    return '<button type="button" class="role-switcher-option" data-action="switch-role" data-role-id="' + esc(choice.roleId) + '" aria-pressed="' + active + '">' +
+    const active = choice.id === identity.id;
+    return '<button type="button" class="role-switcher-option" data-action="switch-role" data-identity-id="' + esc(choice.id) + '" aria-pressed="' + active + '">' +
       '<span class="role-option-name">' + esc(choice.name) + (active ? '<small>Active</small>' : '') + '</span>' +
       '<span class="role-option-role">' + esc(choiceRole.title) + '</span>' +
       '<span class="role-option-level">Level ' + choiceRole.level + '</span>' +
     '</button>';
   }).join("");
+  const roleOptions = Object.values(ROLES)
+    .sort((a, b) => a.level - b.level)
+    .map((choiceRole) => '<option value="' + esc(choiceRole.id) + '">Level ' + choiceRole.level + ' · ' + esc(choiceRole.title) + '</option>')
+    .join("");
 
   return '<details class="role-switcher">' +
     '<summary aria-label="Active demo identity: ' + esc(identity.name) + ', ' + esc(role.title) + ', Level ' + role.level + '">' +
@@ -69,6 +76,14 @@ export function roleSwitcher() {
     '</summary>' +
     '<div class="role-switcher-menu"><span class="role-switcher-heading">DEMO IDENTITY</span>' +
       choices +
+      '<details class="role-create-account"><summary>＋ Create New Account</summary>' +
+        '<form class="role-create-account-form" data-form="create-demo-account">' +
+          '<label class="field"><span>Name <b>*</b></span><input name="name" type="text" maxlength="80" autocomplete="off" placeholder="Enter a display name" required /></label>' +
+          '<label class="field"><span>Access level <b>*</b></span><select name="roleId" required>' + roleOptions + '</select></label>' +
+          '<small class="role-create-account-note">Creates a local demo profile. No sign-in or email is sent.</small>' +
+          '<button class="button button-lime button-small" type="submit">Create account</button>' +
+        '</form>' +
+      '</details>' +
       '<p>Switching updates available pages and actions. This demo does not verify a Google account.</p>' +
     '</div>' +
   '</details>';
@@ -121,7 +136,7 @@ export function footer() {
   <div class="footer-bottom">\
     <span>© ${new Date().getFullYear()} 3D Print Farm</span>\
     <span>Files stay in your browser · no emails are sent</span>
-    <span>v1.4-beta · Version 1.4 Beta</span>\
+    <span>v1.5-beta · Version 1.5 Beta</span>\
   </div>\
 </footer>`;
 }

@@ -1,13 +1,14 @@
-import { MATERIALS } from "./data.js?v=14";
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=14";
-import { notificationsService } from "./notificationsService.js?v=14";
-import { appearanceControls, dateTime, esc, logo, moneylessId, roleSwitcher, shortDate, statusBadge } from "./pageShared.js?v=14";
-import { authService } from "./authService.js?v=14";
-import { PERMISSIONS, ROLES } from "./authorization.js?v=14";
+import { MATERIALS } from "./data.js?v=19";
+import { contributionsService, inventoryService, jobsService } from "./services.js?v=19";
+import { notificationsService } from "./notificationsService.js?v=19";
+import { appearanceControls, dateTime, esc, logo, printNumber, roleSwitcher, shortDate, statusBadge } from "./pageShared.js?v=19";
+import { authService } from "./authService.js?v=19";
+import { PERMISSIONS, ROLES } from "./authorization.js?v=19";
 
-function staffShell(content, active = "overview") {
-  const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]].filter(([id]) => id !== "materials" || authService.can(PERMISSIONS.FILAMENT_VIEW));
-  const pageLabel = ({ overview: "Overview", active: "My active jobs", materials: "Materials", "material-new": "Add filament", hours: "My Hours" })[active] || "Staff Portal";
+export function staffShell(content, active = "overview") {
+  const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "Hours", "◴", "#/staff/hours"]]
+    .filter(([id]) => id !== "materials" || authService.can(PERMISSIONS.FILAMENT_VIEW));
+  const pageLabel = ({ overview: "Overview", active: "My active jobs", materials: "Materials", "material-new": "Add filament", hours: "Hours" })[active] || "Staff Portal";
   return `<div class="staff-app">\
   <aside class="staff-sidebar">\
     <div class="sidebar-brand">\
@@ -69,8 +70,6 @@ function jobTable(jobs) {
       <tr>
         <th>Job / Project</th>
         <th>Submitted by</th>
-        <th>File</th>
-        <th>Material</th>
         <th>Submitted</th>
         <th>Status</th>
         <th>Assigned staff</th>
@@ -81,13 +80,11 @@ function jobTable(jobs) {
       ${jobs.map((job) => `<tr>
   <td>
     <a class="table-project" href="#/staff/jobs/${encodeURIComponent(job.id)}">
-      <strong>${moneylessId(job.id)}</strong>
-      <span>${esc(job.projectName)}</span>
+      <strong class="table-project-name">${esc(job.projectName)}</strong>
+      <span class="table-project-number">${printNumber(job.id)}</span>
     </a>
   </td>
   <td>${esc(job.submitterName)}<small>${esc(job.submitterEmail)}</small></td>
-  <td class="file-cell">${esc(job.fileName)}<small>${esc(job.fileSize)}</small></td>
-  <td><span class="material-chip">${esc(job.material)}</span></td>
   <td>${shortDate(job.submittedAt)}<small>${new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(job.submittedAt))}</small></td>
   <td>${statusBadge(job.status)}</td>
   <td>${job.assignedStaff ? `<span class="assigned"><i></i>${esc(job.assignedStaff)}</span>` : `<span class="unassigned">Unassigned</span>`}</td>
@@ -142,7 +139,6 @@ export async function staffOverview() {
       <h2>Recent jobs</h2>\
       <p>Latest activity across all demo requests</p>\
     </div>\
-    <a class="text-link" href="#/staff/active">View my active jobs ↗</a>\
   </div>\
   ${jobTable(jobs.slice(0, 6))}\
 </section>\
@@ -179,7 +175,7 @@ ${jobs.length ? `<div class="active-jobs-grid">\
   ${jobs.map((job) => `<article class="active-job-card">\
   <div class="active-card-top">\
     <span class="job-id">\
-      ${moneylessId(job.id)}\
+      ${printNumber(job.id)}\
     </span>\
     ${statusBadge(job.status)}\
   </div>\
@@ -299,7 +295,7 @@ export async function staffMaterialDetail(id) {
 const localDateValue = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const totalHours = (items) => items.reduce((sum, item) => sum + Number(item.hours), 0);
 
-export async function staffHours(filters = {}, editingId = "") {
+export async function staffContributions(filters = {}, editingId = "") {
   const [records, allRecords] = await Promise.all([contributionsService.list(filters), contributionsService.listAll()]);
   const studentTotals = new Map();
   records.forEach((item) => studentTotals.set(item.student, (studentTotals.get(item.student) || 0) + Number(item.hours)));
@@ -309,13 +305,13 @@ export async function staffHours(filters = {}, editingId = "") {
     ? `<article class="hours-record is-editing"><form data-form="hours-update" data-id="${esc(item.id)}"><div class="hours-record-heading"><h3>Edit contribution</h3><button type="button" class="text-button" data-action="hours-cancel-edit">Cancel</button></div><div class="hours-record-form-grid"><label class="field"><span>Student</span><input name="student" type="text" maxlength="100" value="${esc(item.student)}" list="student-suggestions" required /></label><label class="field"><span>Date</span><input name="date" type="date" max="${localDateValue()}" value="${esc(item.date)}" required /></label><label class="field"><span>Hours</span><input name="hours" type="number" min="0.01" max="24" step="0.01" value="${Number(item.hours)}" required /></label><label class="field hours-activity"><span>Activity</span><input name="activity" type="text" maxlength="300" value="${esc(item.activity)}" required /></label></div><button class="button button-lime button-small" type="submit">Save changes</button></form></article>`
     : `<article class="hours-record"><div class="hours-record-date">${shortDate(`${item.date}T12:00:00`)}</div><div class="hours-record-main"><div><h3>${esc(item.student)}</h3><span>${esc(item.activity)}</span></div><strong>${Number(item.hours)} ${Number(item.hours) === 1 ? "hour" : "hours"}</strong></div><button type="button" class="button button-outline button-small" data-action="hours-edit" data-id="${esc(item.id)}">Edit</button></article>`).join("")}</div>` : `<div class="empty-state hours-empty"><span>◴</span><h2>${allRecords.length ? "No contributions match these filters" : "No contribution records yet"}</h2><p>${allRecords.length ? "Try a wider date range or a different student name." : "Record a student's first contribution to get started."}</p></div>`;
 
-  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / STUDENT CONTRIBUTIONS</span><h1>My Hours</h1><p>Record and review student contributions to print farm activities.</p></div><span class="demo-pill">LOCAL DEMO STORAGE</span></div>
+  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / STUDENT CONTRIBUTIONS</span><h1>Student contributions</h1><p>Record and review student contributions to print farm activities.</p></div><span class="demo-pill">LOCAL DEMO STORAGE</span></div>
 <section class="hours-summary-grid"><article><span>HOURS IN SELECTED PERIOD</span><strong>${totalHours(records).toFixed(2).replace(/\.00$/, "")}</strong></article><article><span>RECORDS SHOWN</span><strong>${records.length}</strong></article><article><span>STUDENTS SHOWN</span><strong>${studentTotals.size}</strong></article></section>
 <section class="staff-section hours-filter-section"><div class="staff-section-head"><div><h2>Find contributions</h2><p>Totals and records below follow this student/date filter.</p></div></div><form class="hours-filter-form" data-form="hours-filter"><label class="field"><span>Student name</span><input name="student" type="search" value="${esc(filters.student || "")}" placeholder="Search students" /></label><label class="field"><span>From date</span><input name="from" type="date" value="${esc(filters.from || "")}" max="${localDateValue()}" /></label><label class="field"><span>To date</span><input name="to" type="date" value="${esc(filters.to || "")}" max="${localDateValue()}" /></label><div class="hours-filter-actions"><button class="button button-lime button-small" type="submit">Apply filters</button><button class="button button-outline button-small" type="button" data-action="hours-clear-filters">Clear</button></div></form></section>
 <section class="hours-totals-section"><h2>Student totals for selected period</h2>${studentTotals.size ? `<div class="student-total-grid">${[...studentTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([student, hours]) => `<article><span>${esc(student)}</span><strong>${hours.toFixed(2).replace(/\.00$/, "")} h</strong></article>`).join("")}</div>` : `<p class="hours-muted">No student totals to show for this period.</p>`}</section>
 <section class="staff-section hours-add-section"><div class="staff-section-head"><div><h2>Record a contribution</h2><p>Enter completed activity, date, and duration. Decimals such as 1.5 hours are supported.</p></div></div><form class="hours-add-form" data-form="hours-add"><label class="field"><span>Student name <b>*</b></span><input name="student" type="text" maxlength="100" list="student-suggestions" placeholder="Student name" required /><datalist id="student-suggestions">${studentSuggestions.map((name) => `<option value="${esc(name)}"></option>`).join("")}</datalist></label><label class="field"><span>Date <b>*</b></span><input name="date" type="date" max="${localDateValue()}" value="${localDateValue()}" required /></label><label class="field"><span>Duration in hours <b>*</b></span><input name="hours" type="number" min="0.01" max="24" step="0.01" placeholder="e.g. 1.5" required /></label><label class="field hours-add-activity"><span>Activity description <b>*</b></span><input name="activity" type="text" maxlength="300" placeholder="e.g. Prepared and sorted print jobs" required /></label><button class="button button-lime" type="submit">Save contribution <span>＋</span></button></form></section>
 <section class="staff-section hours-records-section"><div class="staff-section-head"><div><h2>Contribution records</h2><p>${records.length} record${records.length === 1 ? "" : "s"} shown · totals are calculated from saved records</p></div></div>${recordCards}</section>
-<div class="staff-note"><span>ⓘ</span><p>Student names use the demo's existing mock profiles and entered display names because no student directory or authentication backend exists. Records are stored locally in this browser.</p></div>`, "hours");
+<div class="staff-note"><span>ⓘ</span><p>Student names use the demo's existing mock profiles and entered display names because no student directory or authentication backend exists. Records are stored locally in this browser.</p></div>`, "contributions");
 }
 
 function historyLabel(event) {
@@ -363,9 +359,9 @@ export async function jobDetailsPage(jobId) {
   <h2>Reassign task</h2>
   <p>Choose a different Level 2 or above member for this job.</p>
   <form class="job-reassignment-form" data-form="job-reassign" data-id="${esc(job.id)}">
-    <label class="field"><span>New assignee</span><select name="assigneeRoleId" required>${reassignTargets.map((identity) => {
+    <label class="field"><span>New assignee</span><select name="assigneeId" required>${reassignTargets.map((identity) => {
       const role = ROLES[identity.roleId];
-      return `<option value="${esc(identity.roleId)}">${esc(identity.name)} · ${esc(role.title)} (Level ${role.level})</option>`;
+      return `<option value="${esc(identity.id)}">${esc(identity.name)} · ${esc(role.title)} (Level ${role.level})</option>`;
     }).join("")}</select></label>
     <button class="button button-lime button-small" type="submit">Reassign task</button>
   </form>
@@ -407,7 +403,7 @@ export async function jobDetailsPage(jobId) {
     /\
   </span>\
   <span>\
-    ${moneylessId(job.id)}\
+    ${printNumber(job.id)}\
   </span>\
 </div>\
 <div class="detail-title-row">\
@@ -420,7 +416,7 @@ export async function jobDetailsPage(jobId) {
     </h1>\
     <div class="detail-title-meta">\
       <span>\
-        ${moneylessId(job.id)}\
+        ${printNumber(job.id)}\
       </span>\
       ${statusBadge(job.status)}\
       <span>\
@@ -431,7 +427,7 @@ export async function jobDetailsPage(jobId) {
   <div class="detail-actions">\
     ${action}\
     <button class="button button-outline button-small" data-action="copy-job" data-id="${esc(job.id)}">\
-      Copy job ID\
+      Copy print number\
     </button>\
   </div>\
 </div>\

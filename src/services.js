@@ -3,11 +3,11 @@ import {
   MOCK_JOBS,
   MOCK_NOTIFICATIONS,
   STATUSES,
-} from "./data.js?v=14";
-import { authService } from "./authService.js?v=14";
-import { getRole, PERMISSIONS } from "./authorization.js?v=14";
-import { API_BASE_URL } from "./apiClient.js?v=14";
-import { filesService } from "./filesService.js?v=14";
+} from "./data.js?v=19";
+import { authService } from "./authService.js?v=19";
+import { getRole, PERMISSIONS } from "./authorization.js?v=19";
+import { API_BASE_URL } from "./apiClient.js?v=19";
+import { filesService } from "./filesService.js?v=19";
 
 const STORE_KEY = "three-d-print-farm-demo-v3";
 const DRAFT_KEY = "three-d-print-farm-draft-v2";
@@ -19,6 +19,7 @@ function seedState() {
     notifications: clone(MOCK_NOTIFICATIONS),
     inventory: [],
     contributions: [],
+    hours: { transactions: [], requests: [] },
   };
 }
 
@@ -90,10 +91,63 @@ function isValidState(value) {
       && Number.isFinite(Number(item.hours))
       && Number(item.hours) > 0
       && typeof item.activity === "string"
+      && (item.staffId === undefined || typeof item.staffId === "string")
+      && (item.submissionKey === undefined || typeof item.submissionKey === "string")
     ))
   );
 
-  return jobsAreValid && notificationsAreValid && inventoryIsValid && contributionsAreValid;
+  const validTimestamp = (timestamp) => typeof timestamp === "string" && !Number.isNaN(Date.parse(timestamp));
+  const hoursAreValid = value.hours === undefined || (
+    isRecord(value.hours)
+    && Array.isArray(value.hours.transactions)
+    && Array.isArray(value.hours.requests)
+    && value.hours.transactions.every((transaction) => (
+      isRecord(transaction)
+      && typeof transaction.id === "string"
+      && typeof transaction.userId === "string"
+      && Number.isSafeInteger(transaction.deltaCenti)
+      && transaction.deltaCenti !== 0
+      && Number.isSafeInteger(transaction.balanceBeforeCenti)
+      && transaction.balanceBeforeCenti >= 0
+      && Number.isSafeInteger(transaction.balanceAfterCenti)
+      && transaction.balanceAfterCenti >= 0
+      && transaction.balanceBeforeCenti + transaction.deltaCenti === transaction.balanceAfterCenti
+      && typeof transaction.reason === "string"
+      && ["manual", "request", "contribution"].includes(transaction.source)
+      && (transaction.submissionKey === undefined || typeof transaction.submissionKey === "string")
+      && (transaction.contributionId === undefined || typeof transaction.contributionId === "string")
+      && (transaction.workDate === undefined || /^\d{4}-\d{2}-\d{2}$/.test(transaction.workDate))
+      && typeof transaction.actorId === "string"
+      && typeof transaction.actorName === "string"
+      && (transaction.requestId === null || typeof transaction.requestId === "string")
+      && validTimestamp(transaction.createdAt)
+    ))
+    && value.hours.requests.every((request) => (
+      isRecord(request)
+      && typeof request.id === "string"
+      && typeof request.submissionKey === "string"
+      && typeof request.requesterId === "string"
+      && typeof request.requesterName === "string"
+      && Number.isInteger(request.requesterLevel)
+      && ["add", "subtract"].includes(request.adjustmentType)
+      && Number.isSafeInteger(request.hoursCenti)
+      && request.hoursCenti > 0
+      && typeof request.reason === "string"
+      && ["Pending", "Approved", "Rejected"].includes(request.status)
+      && validTimestamp(request.submittedAt)
+      && (request.reviewedById === null || typeof request.reviewedById === "string")
+      && (request.reviewedByName === null || typeof request.reviewedByName === "string")
+      && (request.decidedAt === null || validTimestamp(request.decidedAt))
+      && typeof request.rejectionReason === "string"
+      && (request.transactionId === null || typeof request.transactionId === "string")
+      && (request.status === "Pending"
+        ? request.reviewedById === null && request.decidedAt === null && request.transactionId === null
+        : request.reviewedById !== null && request.decidedAt !== null
+          && (request.status === "Approved" ? request.transactionId !== null : request.transactionId === null))
+    ))
+  );
+
+  return jobsAreValid && notificationsAreValid && inventoryIsValid && contributionsAreValid && hoursAreValid;
 }
 
 function normalizeState(value) {
@@ -101,7 +155,59 @@ function normalizeState(value) {
     ...value,
     inventory: Array.isArray(value.inventory) ? value.inventory : [],
     contributions: Array.isArray(value.contributions) ? value.contributions : [],
+    hours: isRecord(value.hours) ? value.hours : { transactions: [], requests: [] },
   };
+}
+
+function identityForContribution(item) {
+  const identities = authService.getDemoIdentities();
+  const identity = item.staffId
+    ? identities.find((candidate) => candidate.id === item.staffId)
+    : identities.find((candidate) => candidate.name.toLowerCase() === String(item.student || "").trim().toLowerCase());
+  const role = identity && getRole(identity.roleId);
+  return identity && role && role.level >= 2 && role.level <= 3 ? { identity, role } : null;
+}
+
+function migrateLegacyStaffContributions(value) {
+  const existingContributionIds = new Set(value.hours.transactions.map((transaction) => transaction.contributionId).filter(Boolean));
+  const legacyRecords = value.contributions
+    .filter((item) => item.id && !existingContributionIds.has(item.id) && identityForContribution(item))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+  if (!legacyRecords.length) return false;
+
+  let timestamp = Date.now();
+  let migratedCount = 0;
+  for (const contribution of legacyRecords) {
+    const matched = identityForContribution(contribution);
+    const userId = matched.identity.id;
+    const hoursCenti = Math.round(Number(contribution.hours) * 100);
+    if (!Number.isSafeInteger(hoursCenti) || hoursCenti <= 0) continue;
+    const balanceBeforeCenti = value.hours.transactions
+      .filter((transaction) => transaction.userId === userId)
+      .reduce((sum, transaction) => sum + transaction.deltaCenti, 0);
+    const balanceAfterCenti = balanceBeforeCenti + hoursCenti;
+    if (!Number.isSafeInteger(balanceAfterCenti)) continue;
+    const actor = authService.getDemoIdentities().find((identity) => identity.name.toLowerCase() === String(contribution.createdBy || "").trim().toLowerCase());
+    const transaction = {
+      id: `HTXN-CONTRIBUTION-${contribution.id}`,
+      userId,
+      deltaCenti: hoursCenti,
+      balanceBeforeCenti,
+      balanceAfterCenti,
+      reason: String(contribution.activity || "Legacy contribution record"),
+      source: "contribution",
+      actorId: actor?.id || "legacy-contribution",
+      actorName: String(contribution.createdBy || "Legacy contribution record"),
+      requestId: null,
+      contributionId: contribution.id,
+      workDate: contribution.date,
+      createdAt: new Date(timestamp++).toISOString(),
+    };
+    value.hours.transactions.unshift(transaction);
+    existingContributionIds.add(contribution.id);
+    migratedCount += 1;
+  }
+  return migratedCount > 0;
 }
 
 function readState() {
@@ -111,7 +217,8 @@ function readState() {
       const parsed = JSON.parse(raw);
       if (isValidState(parsed)) {
         const normalized = normalizeState(parsed);
-        if (parsed.inventory === undefined || parsed.contributions === undefined) writeState(normalized);
+        const migratedContributions = migrateLegacyStaffContributions(normalized);
+        if (parsed.inventory === undefined || parsed.contributions === undefined || parsed.hours === undefined || migratedContributions) writeState(normalized);
         return normalized;
       }
       console.warn("Demo data has an invalid format; restoring the seed data.");
@@ -150,10 +257,20 @@ const assert = (condition, message) => {
 };
 const jobIndex = (id) => state.jobs.findIndex((job) => job.id === id);
 const update = (mutator) => {
-  state = readState();
-  const result = mutator();
-  if (!writeState(state)) throw new Error("This browser could not save the change. Check that local storage is available and try again.");
-  return clone(result);
+  const run = () => {
+    state = readState();
+    const previous = clone(state);
+    const result = mutator();
+    if (!writeState(state)) {
+      state = previous;
+      throw new Error("This browser could not save the change. Check that local storage is available and try again.");
+    }
+    return clone(result);
+  };
+  if (globalThis.navigator?.locks?.request) {
+    return globalThis.navigator.locks.request("three-d-print-farm-state", run);
+  }
+  return run();
 };
 
 function validatePayload(payload) {
@@ -263,11 +380,11 @@ export const jobsService = {
       return job;
     });
   },
-  async reassignJob(jobId, targetRoleId) {
+  async reassignJob(jobId, targetIdentityId) {
     return update(() => {
       assert(authService.can(PERMISSIONS.JOBS_REASSIGN), "Only the Level 4 Print Farm Teacher can reassign jobs.");
-      const targetIdentity = authService.getDemoIdentities().find((identity) => identity.roleId === targetRoleId);
-      const targetRole = getRole(targetRoleId);
+      const targetIdentity = authService.getDemoIdentities().find((identity) => identity.id === targetIdentityId);
+      const targetRole = targetIdentity && getRole(targetIdentity.roleId);
       assert(targetIdentity && targetRole && targetRole.level >= 2, "Choose a Level 2 or above staff member.");
       const index = jobIndex(jobId);
       assert(index >= 0, "Job not found.");
@@ -631,6 +748,7 @@ function validateContribution(payload) {
 
 export const contributionsService = {
   async list(filters = {}) {
+    requireHoursPermission(PERMISSIONS.CONTRIBUTIONS_MANAGE);
     state = readState();
     const search = String(filters.student || "").trim().toLowerCase();
     return clone(state.contributions.filter((item) => (
@@ -640,13 +758,16 @@ export const contributionsService = {
     )).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)));
   },
   async listAll() {
+    requireHoursPermission(PERMISSIONS.CONTRIBUTIONS_MANAGE);
     state = readState();
     return clone([...state.contributions]);
   },
   async add(payload) {
+    requireHoursPermission(PERMISSIONS.CONTRIBUTIONS_MANAGE);
     return update(() => {
       const normalized = { ...payload, student: String(payload.student || "").trim(), date: String(payload.date || ""), hours: Number(payload.hours), activity: String(payload.activity || "").trim() };
       validateContribution(normalized);
+      assert(!identityForContribution(normalized), "Give hours to Level 2 or Level 3 staff from the Hours dashboard so their balance and contribution history stay linked.");
       const timestamp = nowIso();
       const record = { id: localId("HRS"), ...normalized, createdAt: timestamp, updatedAt: timestamp, createdBy: currentStaff().name };
       state.contributions.unshift(record);
@@ -654,13 +775,412 @@ export const contributionsService = {
     });
   },
   async update(id, payload) {
+    requireHoursPermission(PERMISSIONS.CONTRIBUTIONS_MANAGE);
     return update(() => {
       const record = state.contributions.find((item) => item.id === id);
       assert(record, "Contribution record not found. Refresh the page and try again.");
+      assert(!state.hours.transactions.some((transaction) => transaction.contributionId === id), "This contribution is linked to a staff balance and cannot be edited. Record a new correction from Hours instead.");
       const normalized = { ...payload, student: String(payload.student || "").trim(), date: String(payload.date || ""), hours: Number(payload.hours), activity: String(payload.activity || "").trim() };
       validateContribution(normalized);
       Object.assign(record, normalized, { updatedAt: nowIso() });
       return record;
+    });
+  },
+};
+
+const hoursTransactions = () => state.hours.transactions;
+const hoursRequests = () => state.hours.requests;
+const hoursBalanceCenti = (userId) => hoursTransactions()
+  .filter((transaction) => transaction.userId === userId)
+  .reduce((total, transaction) => total + transaction.deltaCenti, 0);
+const hoursForUser = (userId) => hoursTransactions()
+  .filter((transaction) => transaction.userId === userId)
+  .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+const hourRequestOrder = (a, b) => b.submittedAt.localeCompare(a.submittedAt);
+const resolveDemoIdentity = (userId) => authService.getDemoIdentities().find((identity) => identity.id === userId) || null;
+const parseHourAmountCenti = (rawValue) => {
+  const raw = String(rawValue ?? "").trim();
+  assert(/^\d+(?:\.\d{1,2})?$/.test(raw), "Enter a positive number of hours using up to two decimal places.");
+  const [whole, fraction = ""] = raw.split(".");
+  const value = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  assert(Number.isSafeInteger(value) && value > 0, "Hours must be greater than zero.");
+  return value;
+};
+const validateHoursReason = (value, label = "reason") => {
+  const reason = String(value || "").trim();
+  assert(reason.length > 0 && reason.length <= 500, `Enter a ${label} of up to 500 characters.`);
+  return reason;
+};
+const requireHoursPermission = (permission) => {
+  assert(authService.can(permission), "You do not have permission to access this hours operation.");
+};
+const staffRoleForUser = (userId) => {
+  const identity = resolveDemoIdentity(userId);
+  const role = identity && getRole(identity.roleId);
+  return role ? { identity, role } : null;
+};
+const isEligibleHoursStaff = (userId) => {
+  const record = staffRoleForUser(userId);
+  return Boolean(record && record.role.level >= 2 && record.role.level <= 3);
+};
+
+export const hoursService = {
+  newSubmissionKey() {
+    return localId("HREQKEY");
+  },
+  async getOwnDashboard() {
+    requireHoursPermission(PERMISSIONS.HOURS_VIEW_OWN);
+    const role = authService.getCurrentRole();
+    assert(role && role.level >= 2 && role.level <= 3, "Only Level 2 and Level 3 staff have personal hour balances.");
+    state = readState();
+    const identity = currentUser();
+    const transactions = hoursForUser(identity.id);
+    const requests = hoursRequests().filter((request) => request.requesterId === identity.id).sort(hourRequestOrder);
+    return clone({
+      identity,
+      balanceCenti: hoursBalanceCenti(identity.id),
+      transactions,
+      requests,
+      pendingCount: requests.filter((request) => request.status === "Pending").length,
+    });
+  },
+  async getStaffOverview(search = "") {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    state = readState();
+    const query = String(search || "").trim().toLowerCase();
+    return clone(authService.getDemoIdentities()
+      .filter((identity) => isEligibleHoursStaff(identity.id))
+      .filter((identity) => !query || identity.name.toLowerCase().includes(query))
+      .map((identity) => {
+        const transactions = hoursForUser(identity.id);
+        const pendingRequests = hoursRequests()
+          .filter((request) => request.requesterId === identity.id && request.status === "Pending")
+          .sort(hourRequestOrder)
+          .map((request) => ({
+            id: request.id,
+            adjustmentType: request.adjustmentType,
+            hoursCenti: request.hoursCenti,
+          }));
+        return {
+          id: identity.id,
+          name: identity.name,
+          roleId: identity.roleId,
+          roleTitle: getRole(identity.roleId).title,
+          level: getRole(identity.roleId).level,
+          balanceCenti: hoursBalanceCenti(identity.id),
+          latestTransaction: transactions[0] || null,
+          pendingRequests,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name)));
+  },
+  async getStaffDetail(userId) {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    state = readState();
+    assert(isEligibleHoursStaff(userId), "Choose a Level 2 or Level 3 staff member.");
+    const identity = resolveDemoIdentity(userId);
+    const role = getRole(identity.roleId);
+    return clone({
+      id: identity.id,
+      name: identity.name,
+      roleId: identity.roleId,
+      roleTitle: role.title,
+      level: role.level,
+      balanceCenti: hoursBalanceCenti(identity.id),
+      transactions: hoursForUser(identity.id),
+      requests: hoursRequests()
+        .filter((request) => request.requesterId === identity.id)
+        .sort(hourRequestOrder)
+        .map((request) => {
+          const transaction = request.transactionId
+            ? hoursTransactions().find((item) => item.id === request.transactionId) || null
+            : null;
+          return {
+            ...request,
+            staffName: identity.name,
+            staffLevel: role.level,
+            staffRoleTitle: role.title,
+            transaction,
+          };
+        }),
+    });
+  },
+  async listRequests(status = "ALL") {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    state = readState();
+    assert(["ALL", "Pending", "Approved", "Rejected"].includes(status), "Choose a valid request status filter.");
+    return clone(hoursRequests()
+      .filter((request) => status === "ALL" || request.status === status)
+      .sort(hourRequestOrder)
+      .map((request) => {
+        const target = staffRoleForUser(request.requesterId);
+        const transaction = request.transactionId
+          ? hoursTransactions().find((item) => item.id === request.transactionId) || null
+          : null;
+        return {
+          ...request,
+          staffName: target?.identity.name || request.requesterName,
+          staffLevel: target?.role.level || request.requesterLevel,
+          staffRoleTitle: target?.role.title || "Former demo identity",
+          transaction,
+        };
+      }));
+  },
+  async getAdminActivity(userId) {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    requireHoursPermission(PERMISSIONS.CONTRIBUTIONS_MANAGE);
+    state = readState();
+    assert(isEligibleHoursStaff(userId), "Choose a Level 2 or Level 3 staff member.");
+    const identity = resolveDemoIdentity(userId);
+    const role = getRole(identity.roleId);
+    const linkedContributionIds = new Set(hoursTransactions().map((transaction) => transaction.contributionId).filter(Boolean));
+    const transactionActivity = hoursForUser(userId).map((transaction) => {
+      const sourceLabel = transaction.source === "request"
+        ? "Approved request"
+        : transaction.source === "contribution" ? "Student contribution" : "Balance correction";
+      return {
+        id: transaction.id,
+        userId: transaction.userId,
+        userName: identity.name,
+        level: role.level,
+        source: transaction.source,
+        sourceLabel,
+        deltaCenti: transaction.deltaCenti,
+        hoursCenti: Math.abs(transaction.deltaCenti),
+        reason: transaction.reason,
+        actorName: transaction.actorName,
+        workDate: transaction.workDate || null,
+        createdAt: transaction.createdAt,
+        balanceBeforeCenti: transaction.balanceBeforeCenti,
+        balanceAfterCenti: transaction.balanceAfterCenti,
+        affectsBalance: true,
+      };
+    });
+    const otherContributions = state.contributions
+      .filter((contribution) => !linkedContributionIds.has(contribution.id)
+        && (contribution.staffId === userId
+          || String(contribution.student || "").trim().toLowerCase() === identity.name.toLowerCase()))
+      .map((contribution) => ({
+        id: contribution.id,
+        userId: contribution.staffId || null,
+        userName: contribution.student,
+        level: null,
+        source: "student_contribution",
+        sourceLabel: "Student contribution",
+        deltaCenti: null,
+        hoursCenti: Math.round(Number(contribution.hours) * 100),
+        reason: contribution.activity,
+        actorName: contribution.createdBy || "Unknown",
+        workDate: contribution.date,
+        createdAt: contribution.createdAt || `${contribution.date}T12:00:00.000Z`,
+        balanceBeforeCenti: null,
+        balanceAfterCenti: null,
+        affectsBalance: false,
+      }));
+    return clone([...transactionActivity, ...otherContributions]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  },
+  async submitRequest(payload) {
+    requireHoursPermission(PERMISSIONS.HOURS_REQUEST);
+    const actor = currentUser();
+    const role = getRole(actor.roleId);
+    assert(role && role.level >= 2 && role.level <= 3, "Only Level 2 and Level 3 staff can request an hour adjustment.");
+    const adjustmentType = String(payload?.adjustmentType || "");
+    assert(["add", "subtract"].includes(adjustmentType), "Choose additional hours or a correction/deduction.");
+    const hoursCenti = parseHourAmountCenti(payload?.hours);
+    const reason = validateHoursReason(payload?.reason, "explanation");
+    const submissionKey = String(payload?.submissionKey || "").trim();
+    assert(submissionKey.length >= 8 && submissionKey.length <= 120, "This request form has expired. Refresh the page and try again.");
+
+    return update(() => {
+      const duplicate = hoursRequests().find((request) => request.submissionKey === submissionKey);
+      if (duplicate) {
+        assert(duplicate.requesterId === actor.id, "This request key is already in use.");
+        return duplicate;
+      }
+      const request = {
+        id: localId("HREQ"),
+        submissionKey,
+        requesterId: actor.id,
+        requesterName: actor.name,
+        requesterLevel: role.level,
+        adjustmentType,
+        hoursCenti,
+        reason,
+        status: "Pending",
+        submittedAt: nowIso(),
+        reviewedById: null,
+        reviewedByName: null,
+        decidedAt: null,
+        rejectionReason: "",
+        transactionId: null,
+      };
+      hoursRequests().unshift(request);
+      return request;
+    });
+  },
+  async giveHours(userId, payload) {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    requireHoursPermission(PERMISSIONS.CONTRIBUTIONS_MANAGE);
+    const actor = currentUser();
+    assert(actor.id !== userId, "Choose another staff member before giving hours.");
+    const target = resolveDemoIdentity(userId);
+    assert(target && isEligibleHoursStaff(userId), "Choose a Level 2 or Level 3 staff member.");
+    const date = String(payload?.date || "");
+    const activity = String(payload?.activity || "").trim();
+    const hoursCenti = parseHourAmountCenti(payload?.hours);
+    const normalized = { student: target.name, date, hours: hoursCenti / 100, activity };
+    validateContribution(normalized);
+    assert(hoursCenti % 1 === 0 && hoursCenti <= 2400, "Give no more than 24 hours in one contribution.");
+    const submissionKey = String(payload?.submissionKey || "").trim();
+    assert(submissionKey.length >= 8 && submissionKey.length <= 120, "This form has expired. Refresh the staff details and try again.");
+    const expectedBalanceCenti = Number(payload?.expectedBalanceCenti);
+    assert(Number.isSafeInteger(expectedBalanceCenti) && expectedBalanceCenti >= 0, "Refresh the staff details before confirming this contribution.");
+
+    return update(() => {
+      const duplicate = state.contributions.find((contribution) => (
+        contribution.submissionKey === submissionKey && contribution.createdById === actor.id
+      ));
+      if (duplicate) {
+        const transaction = hoursTransactions().find((item) => item.contributionId === duplicate.id);
+        assert(transaction, "This contribution exists without a linked hour transaction. Ask an administrator to review the demo data.");
+        return { contribution: duplicate, transaction };
+      }
+      const balanceBeforeCenti = hoursBalanceCenti(userId);
+      assert(balanceBeforeCenti === expectedBalanceCenti, "This balance changed after the page was opened. Review the latest balance and try again.");
+      const balanceAfterCenti = balanceBeforeCenti + hoursCenti;
+      assert(Number.isSafeInteger(balanceAfterCenti), "This contribution would create an invalid hour balance.");
+      const timestamp = nowIso();
+      const contribution = {
+        id: localId("HRS"),
+        ...normalized,
+        staffId: target.id,
+        submissionKey,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        createdBy: actor.name,
+        createdById: actor.id,
+      };
+      const transaction = {
+        id: localId("HTXN"),
+        userId: target.id,
+        deltaCenti: hoursCenti,
+        balanceBeforeCenti,
+        balanceAfterCenti,
+        reason: activity,
+        source: "contribution",
+        actorId: actor.id,
+        actorName: actor.name,
+        requestId: null,
+        contributionId: contribution.id,
+        workDate: date,
+        createdAt: timestamp,
+      };
+      state.contributions.unshift(contribution);
+      hoursTransactions().unshift(transaction);
+      return { contribution, transaction };
+    });
+  },
+  async adjustStaffHours(userId, payload) {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    const actor = currentUser();
+    assert(actor.id !== userId, "Choose another staff member for a direct adjustment.");
+    assert(isEligibleHoursStaff(userId), "Choose a Level 2 or Level 3 staff member.");
+    const adjustmentType = String(payload?.adjustmentType || "");
+    assert(adjustmentType === "subtract", "Use Give hours to add hours so the balance and contribution history remain linked.");
+    const hoursCenti = parseHourAmountCenti(payload?.hours);
+    const reason = validateHoursReason(payload?.reason);
+    const submissionKey = String(payload?.submissionKey || "").trim();
+    assert(submissionKey.length >= 8 && submissionKey.length <= 120, "This adjustment form has expired. Refresh the page and try again.");
+    const expectedBalanceCenti = Number(payload?.expectedBalanceCenti);
+    assert(Number.isSafeInteger(expectedBalanceCenti) && expectedBalanceCenti >= 0, "Refresh the staff details before confirming this adjustment.");
+
+    return update(() => {
+      const duplicate = hoursTransactions().find((transaction) => (
+        transaction.actorId === actor.id && transaction.submissionKey === submissionKey
+      ));
+      if (duplicate) return duplicate;
+      const target = resolveDemoIdentity(userId);
+      assert(target && isEligibleHoursStaff(target.id), "This staff record is no longer available.");
+      const balanceBeforeCenti = hoursBalanceCenti(userId);
+      assert(balanceBeforeCenti === expectedBalanceCenti, "This balance changed after the page was opened. Review the latest balance and confirm again.");
+      const deltaCenti = adjustmentType === "add" ? hoursCenti : -hoursCenti;
+      const balanceAfterCenti = balanceBeforeCenti + deltaCenti;
+      assert(Number.isSafeInteger(balanceAfterCenti) && balanceAfterCenti >= 0, "This adjustment would create an invalid or negative hour balance.");
+      const transaction = {
+        id: localId("HTXN"),
+        userId,
+        deltaCenti,
+        balanceBeforeCenti,
+        balanceAfterCenti,
+        reason,
+        source: "manual",
+        submissionKey,
+        actorId: actor.id,
+        actorName: actor.name,
+        requestId: null,
+        createdAt: nowIso(),
+      };
+      hoursTransactions().unshift(transaction);
+      return transaction;
+    });
+  },
+  async approveRequest(requestId) {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    const reviewer = currentUser();
+    return update(() => {
+      const request = hoursRequests().find((item) => item.id === requestId);
+      assert(request, "Request not found. Refresh the page and try again.");
+      assert(request.status === "Pending", "This request has already been reviewed.");
+      assert(!hoursTransactions().some((transaction) => transaction.requestId === request.id), "This request already has a recorded transaction.");
+      assert(request.requesterId !== reviewer.id, "You cannot approve your own request.");
+      assert(staffRoleForUser(request.requesterId), "The requesting staff record is no longer available.");
+      const balanceBeforeCenti = hoursBalanceCenti(request.requesterId);
+      const deltaCenti = request.adjustmentType === "add" ? request.hoursCenti : -request.hoursCenti;
+      const balanceAfterCenti = balanceBeforeCenti + deltaCenti;
+      assert(Number.isSafeInteger(balanceAfterCenti) && balanceAfterCenti >= 0, "This adjustment would create an invalid or negative balance. Reject the request or ask for a smaller correction.");
+      const transaction = {
+        id: localId("HTXN"),
+        userId: request.requesterId,
+        deltaCenti,
+        balanceBeforeCenti,
+        balanceAfterCenti,
+        reason: request.reason,
+        source: "request",
+        actorId: reviewer.id,
+        actorName: reviewer.name,
+        requestId: request.id,
+        createdAt: nowIso(),
+      };
+      hoursTransactions().unshift(transaction);
+      Object.assign(request, {
+        status: "Approved",
+        reviewedById: reviewer.id,
+        reviewedByName: reviewer.name,
+        decidedAt: transaction.createdAt,
+        transactionId: transaction.id,
+      });
+      return { request, transaction };
+    });
+  },
+  async rejectRequest(requestId, rejectionReason = "") {
+    requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
+    const reviewer = currentUser();
+    const reason = String(rejectionReason || "").trim();
+    assert(reason.length <= 500, "Keep the rejection reason under 500 characters.");
+    return update(() => {
+      const request = hoursRequests().find((item) => item.id === requestId);
+      assert(request, "Request not found. Refresh the page and try again.");
+      assert(request.status === "Pending", "This request has already been reviewed.");
+      assert(request.requesterId !== reviewer.id, "You cannot reject your own request.");
+      Object.assign(request, {
+        status: "Rejected",
+        reviewedById: reviewer.id,
+        reviewedByName: reviewer.name,
+        decidedAt: nowIso(),
+        rejectionReason: reason,
+      });
+      return request;
     });
   },
 };

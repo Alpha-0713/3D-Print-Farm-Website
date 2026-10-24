@@ -8,6 +8,9 @@ export const PERMISSIONS = Object.freeze({
   FILAMENT_VIEW: "filament.view",
   FILAMENT_CHANGE: "filament.change",
   NOTIFICATIONS_RETRY: "notifications.retry",
+  HOURS_VIEW_OWN: "hours.view_own",
+  HOURS_REQUEST: "hours.request",
+  HOURS_ADMIN: "hours.admin",
 });
 
 export const ROLES = Object.freeze({
@@ -26,9 +29,10 @@ export const ROLES = Object.freeze({
     permissions: [
       PERMISSIONS.STAFF_DASHBOARD_VIEW,
       PERMISSIONS.JOBS_MANAGE,
-      PERMISSIONS.CONTRIBUTIONS_MANAGE,
       PERMISSIONS.FILAMENT_VIEW,
       PERMISSIONS.NOTIFICATIONS_RETRY,
+      PERMISSIONS.HOURS_VIEW_OWN,
+      PERMISSIONS.HOURS_REQUEST,
     ],
   }),
   senior_print_farm_member: Object.freeze({
@@ -43,7 +47,7 @@ export const ROLES = Object.freeze({
     title: "Print Farm Teacher",
     level: 4,
     inherits: ["senior_print_farm_member"],
-    permissions: [PERMISSIONS.JOBS_REASSIGN],
+    permissions: [PERMISSIONS.JOBS_REASSIGN, PERMISSIONS.HOURS_ADMIN, PERMISSIONS.CONTRIBUTIONS_MANAGE],
   }),
 });
 
@@ -74,7 +78,8 @@ export const ROUTE_PERMISSIONS = Object.freeze({
   materials: PERMISSIONS.STAFF_DASHBOARD_VIEW,
   "material-new": PERMISSIONS.FILAMENT_CHANGE,
   filament: PERMISSIONS.FILAMENT_VIEW,
-  hours: PERMISSIONS.STAFF_DASHBOARD_VIEW,
+  hours: PERMISSIONS.HOURS_VIEW_OWN,
+  contributions: PERMISSIONS.HOURS_ADMIN,
   job: PERMISSIONS.STAFF_DASHBOARD_VIEW,
 });
 
@@ -95,12 +100,18 @@ export const ACTION_PERMISSIONS = Object.freeze({
   "hours-edit": PERMISSIONS.CONTRIBUTIONS_MANAGE,
   "hours-cancel-edit": PERMISSIONS.CONTRIBUTIONS_MANAGE,
   "hours-clear-filters": PERMISSIONS.STAFF_DASHBOARD_VIEW,
+  "hours-approve": PERMISSIONS.HOURS_ADMIN,
+  "hours-reject": PERMISSIONS.HOURS_ADMIN,
   "copy-job": PERMISSIONS.STAFF_DASHBOARD_VIEW,
 });
 
 export const FORM_PERMISSIONS = Object.freeze({
   "model-link": PERMISSIONS.PRINT_REQUEST_CREATE,
   "hours-filter": PERMISSIONS.STAFF_DASHBOARD_VIEW,
+  "hours-request": PERMISSIONS.HOURS_REQUEST,
+  "hours-admin-give": PERMISSIONS.HOURS_ADMIN,
+  "hours-admin-adjust": PERMISSIONS.HOURS_ADMIN,
+  "hours-admin-filter": PERMISSIONS.HOURS_ADMIN,
   "inventory-add": PERMISSIONS.FILAMENT_CHANGE,
   "inventory-update": PERMISSIONS.FILAMENT_CHANGE,
   "inventory-adjust": PERMISSIONS.FILAMENT_CHANGE,
@@ -119,4 +130,7 @@ export const PERMISSION_LABELS = Object.freeze({
   [PERMISSIONS.FILAMENT_VIEW]: "viewing filament details",
   [PERMISSIONS.FILAMENT_CHANGE]: "changing filament records and stock",
   [PERMISSIONS.NOTIFICATIONS_RETRY]: "retrying simulated notifications",
+  [PERMISSIONS.HOURS_VIEW_OWN]: "viewing your own hour balance and history",
+  [PERMISSIONS.HOURS_REQUEST]: "requesting an hour adjustment",
+  [PERMISSIONS.HOURS_ADMIN]: "managing staff hour balances and requests",
 });

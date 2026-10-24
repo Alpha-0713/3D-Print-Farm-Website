@@ -1,12 +1,12 @@
-import { jobsService } from "./services.js?v=14";
-import { authService } from "./authService.js?v=14";
-import { esc, footer, moneylessId, publicHeader, shortDate, statusBadge } from "./pageShared.js?v=14";
+import { jobsService } from "./services.js?v=19";
+import { authService } from "./authService.js?v=19";
+import { esc, footer, printNumber, publicHeader, shortDate, statusBadge } from "./pageShared.js?v=19";
 
 function jobCard(job, showAction = true) {
   return `<article class="job-card">\
   <div class="job-card-head">\
     <span class="job-id">\
-      ${moneylessId(job.id)}\
+      ${printNumber(job.id)}\
     </span>\
     ${statusBadge(job.status)}\
   </div>\
