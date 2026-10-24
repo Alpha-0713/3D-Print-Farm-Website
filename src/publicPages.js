@@ -1,6 +1,6 @@
-import { MATERIALS } from "./data.js?v=8";
-import { esc, footer, publicHeader } from "./pageShared.js?v=8";
-import { partArtwork } from "./visualComponents.js?v=8";
+import { MATERIALS } from "./data.js?v=12";
+import { esc, footer, publicHeader } from "./pageShared.js?v=12";
+import { partArtwork } from "./visualComponents.js?v=12";
 
 const safeSwatch = (color) => (/^(#[\da-f]{3,8}|[a-z]{1,24})$/i.test(color) ? color : "#899080");
 

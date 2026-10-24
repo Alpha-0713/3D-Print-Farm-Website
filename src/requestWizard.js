@@ -1,6 +1,6 @@
-import { MATERIALS } from "./data.js?v=8";
-import { inventoryService } from "./services.js?v=8";
-import { esc, footer, moneylessId, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=8";
+import { MATERIALS } from "./data.js?v=12";
+import { inventoryService } from "./services.js?v=12";
+import { esc, footer, moneylessId, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=12";
 
 function stepIndicator(active) {
   const steps = [[1, "Upload model"], [2, "Print settings"], [3, "Project details"], [4, "Review & submit"]];

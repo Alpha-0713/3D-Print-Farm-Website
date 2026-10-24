@@ -1,7 +1,7 @@
-import { DEMO_STAFF, MATERIALS } from "./data.js?v=8";
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=8";
-import { notificationsService } from "./notificationsService.js?v=8";
-import { dateTime, esc, logo, moneylessId, shortDate, statusBadge } from "./pageShared.js?v=8";
+import { DEMO_STAFF, MATERIALS } from "./data.js?v=12";
+import { contributionsService, inventoryService, jobsService } from "./services.js?v=12";
+import { notificationsService } from "./notificationsService.js?v=12";
+import { appearanceControls, dateTime, esc, logo, moneylessId, shortDate, statusBadge } from "./pageShared.js?v=12";
 
 function staffShell(content, active = "overview") {
   const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]];
@@ -9,21 +9,7 @@ function staffShell(content, active = "overview") {
   return `<div class="staff-app">\
   <aside class="staff-sidebar">\
     <div class="sidebar-brand">\
-      ${logo()}\
-      <span class="staff-app-label">\
-        STAFF WORKSPACE\
-      </span>\
-    </div>\
-    <div class="workspace-select">\
-      <small>\
-        PROJECT WORKSPACE\
-      </small>\
-      <strong>\
-        School Print Farm \
-        <span>\
-          ⌄\
-        </span>\
-      </strong>\
+      <div class="sidebar-brand-main">${logo()}${appearanceControls()}</div>\
     </div>\
     <nav aria-label="Staff navigation">\
   ${links.map(([id, label, icon, href]) => `<a class="sidebar-link ${active === id ? "selected" : ""}" href="${href}" ${active === id ? 'aria-current="page"' : ""}>\

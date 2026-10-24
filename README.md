@@ -1,15 +1,15 @@
 
-# School 3D Print Farm Demo — v1.2
+# School 3D Print Farm Demo — v1.3
 
 **A responsive, frontend-only prototype for a school 3D-print request workflow.**
 
-![version](https://img.shields.io/badge/version-1.2-blue)
+![version](https://img.shields.io/badge/version-1.3-blue)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JS-f7df1e?logo=javascript&logoColor=black)
 ![backend](https://img.shields.io/badge/backend-none-lightgrey)
 ![storage](https://img.shields.io/badge/storage-localStorage-orange)
 ![status](https://img.shields.io/badge/status-demo%20only-red)
 
-[Quick start](#quick-start) · [Routes](#routes) · [What's new](#v12-release-summary) · [Limits](#data-backend-and-security-limits) · [Testing](#testing) · [Files](#project-structure)
+[Quick start](#quick-start) · [Routes](#routes) · [What's new](#v13-release-summary) · [Limits](#data-backend-and-security-limits) · [Testing](#testing) · [Files](#project-structure)
 
 ---
 
@@ -17,7 +17,7 @@
 >
 > This is a **demonstration only**. Do not use it with real student data, production requests, or stock control that needs shared or secured records.
 
-Version 1.2 restores the established Staff Overview with four job metrics and the six newest requests, removes the retired queue page from staff navigation, and streamlines the request wizard by removing layer-height and infill options. The Materials workspace supports adding, editing, and adjusting filament stock. Earlier releases added the public FAQ, student contribution records, and interactive 3D model previews.
+Version 1.3 adds a site-wide appearance system with six selectable accent colours and persistent light and dark themes. The controls are available across public, student, and staff pages. The release also preserves the v1.2 Staff Overview, Materials workspace, and request-wizard improvements described below.
 
 ## Quick start
 
@@ -49,9 +49,15 @@ An internet connection is required to load the pinned Three.js and fflate previe
 
 Legacy links to `#/staff/queue` redirect to the Staff Overview.
 
-## v1.2 release summary
+## v1.3 release summary
 
-The current staff navigation includes Overview, My active jobs, Materials, and My Hours. Older `#/staff/queue` links redirect to the Staff Overview. The Overview presents counts for unclaimed, in-progress, printing, and completed-today jobs, followed by the six most recently submitted requests. The request wizard does not ask students to choose layer height or infill.
+The accent palette includes Green (the default), Blue, Purple, Teal, Orange, and Rose. Accent and theme preferences persist independently across reloads and navigation. Centralized theme tokens keep links, buttons, focus states, active navigation, forms, cards, and other shared components consistent; success, warning, error, and information colors retain their semantic meanings.
+
+The light theme covers public, student, and staff interfaces while preserving the existing dark theme. The appearance controls support keyboard use and remain available in responsive layouts.
+
+### Previous release details (v1.2)
+
+Version 1.2 restored the Staff Overview with four job metrics and the six newest requests, removed the retired queue page from staff navigation, and streamlined the request wizard by removing layer-height and infill options. The Materials workspace supports adding, editing, and adjusting filament stock. The staff navigation includes Overview, My active jobs, Materials, and My Hours. Older `#/staff/queue` links redirect to the Staff Overview.
 
 ### Previous release details (v1.1.1)
 
@@ -180,7 +186,16 @@ A production deployment needs a backend, a configured database, and real staff/s
 
 ## Testing
 
-There is no automated test suite or package manifest. A standalone JavaScript syntax check could not be run because Node.js was not installed in the verification environment. The browser loaded and exercised the modules through the static server.
+There is no automated test suite or package manifest. A standalone JavaScript syntax check could not be run because Node.js was not installed in the verification environment.
+
+### Browser verification performed for v1.3
+
+- Checked all 12 accent and theme combinations, including that changing one preference preserves the other and both settings persist after reload and navigation.
+- Checked the public home, request wizard, and student job pages, plus staff overview, active jobs, materials, hours, material form, and job details.
+- Checked keyboard operation of the accent selector, responsive layout, and the light/dark favicon update.
+- Inspected browser console output; no errors or warnings appeared. `git diff --check` passed.
+
+The app modules were also loaded through the static HTTP server. No build, lint, or type-check scripts are configured in this repository.
 
 <details>
 <summary><b>Manual verification performed for v1.1</b></summary>

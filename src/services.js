@@ -5,9 +5,9 @@ import {
   MOCK_JOBS,
   MOCK_NOTIFICATIONS,
   STATUSES,
-} from "./data.js?v=8";
-import { API_BASE_URL } from "./apiClient.js?v=8";
-import { filesService } from "./filesService.js?v=8";
+} from "./data.js?v=12";
+import { API_BASE_URL } from "./apiClient.js?v=12";
+import { filesService } from "./filesService.js?v=12";
 
 const STORE_KEY = "three-d-print-farm-demo-v3";
 const DRAFT_KEY = "three-d-print-farm-draft-v2";
