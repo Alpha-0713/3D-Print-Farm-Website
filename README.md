@@ -104,10 +104,6 @@ Jobs, notifications, inventory, and contribution records use the browser localSt
     └── styles.css                  # Components and responsive layout
 ~~~
 
-## Verification
-
-There is no automated test suite, package manifest, build, lint, or type-check configuration in this repository. For a manual review, run the quick-start server and switch through each identity. Check the Staff Portal routes, Level 2 read-only Materials view, Level 3 filament controls, request wizard, and mobile layout. The browser-side demo guards do not replace backend security.
-
 ---
 
 <sub>For demonstration only. Do not use with real student data or production requests.</sub>
