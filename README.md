@@ -1,23 +1,17 @@
 
-# School 3D Print Farm Demo — v1.3
+# School 3D Print Farm Demo - v1.3b
 
 **A responsive, frontend-only prototype for a school 3D-print request workflow.**
+
 
 ![version](https://img.shields.io/badge/version-1.3-blue)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JS-f7df1e?logo=javascript&logoColor=black)
 ![backend](https://img.shields.io/badge/backend-none-lightgrey)
 ![storage](https://img.shields.io/badge/storage-localStorage-orange)
-![status](https://img.shields.io/badge/status-demo%20only-red)
-
-[Quick start](#quick-start) · [Routes](#routes) · [What's new](#v13-release-summary) · [Limits](#data-backend-and-security-limits) · [Testing](#testing) · [Files](#project-structure)
 
 ---
 
-> [!WARNING]
->
-> This is a **demonstration only**. Do not use it with real student data, production requests, or stock control that needs shared or secured records.
-
-Version 1.3 adds a site-wide appearance system with six selectable accent colours and persistent light and dark themes. The controls are available across public, student, and staff pages. The release also preserves the v1.2 Staff Overview, Materials workspace, and request-wizard improvements described below.
+Version 1.3 Beta adds a site-wide appearance system with six selectable accent colours and persistent light and dark themes. The controls are available across public, student, and staff pages.
 
 ## Quick start
 
@@ -49,41 +43,25 @@ An internet connection is required to load the pinned Three.js and fflate previe
 
 Legacy links to `#/staff/queue` redirect to the Staff Overview.
 
-## v1.3 release summary
+## v1.3 beta release summary
 
 The accent palette includes Green (the default), Blue, Purple, Teal, Orange, and Rose. Accent and theme preferences persist independently across reloads and navigation. Centralized theme tokens keep links, buttons, focus states, active navigation, forms, cards, and other shared components consistent; success, warning, error, and information colors retain their semantic meanings.
 
 The light theme covers public, student, and staff interfaces while preserving the existing dark theme. The appearance controls support keyboard use and remain available in responsive layouts.
 
-### Previous release details (v1.2)
+### Previous release details (v1.2b)
 
-Version 1.2 restored the Staff Overview with four job metrics and the six newest requests, removed the retired queue page from staff navigation, and streamlined the request wizard by removing layer-height and infill options. The Materials workspace supports adding, editing, and adjusting filament stock. The staff navigation includes Overview, My active jobs, Materials, and My Hours. Older `#/staff/queue` links redirect to the Staff Overview.
-
-### Previous release details (v1.1.1)
-
-In v1.1.1, the public home page removed the header FAQ link, tagline, promotional line, and brand eyebrow. The remaining hero content fills the page without the removed stats row.
-
-The Get Started form accepts STL, 3MF, and OBJ files up to 25 MB. It previews the selected model geometry in an interactive Three.js viewport with orbit, zoom, and pan controls. The file is parsed in the browser and only filename and size metadata enter the local demo request; model bytes are not uploaded or saved. Replacing or removing a model disposes the prior preview.
-
-Users can also provide a direct HTTPS model URL. The browser retrieves the file without credentials, enforces the same 25 MB limit, then passes the bytes through the same validation and preview flow. The source must allow cross-origin browser access (CORS); authenticated pages, indirect links, or servers that block CORS are reported as unavailable. There is no backend proxy. The 3MF loader uses fflate 0.8.3 for ZIP parsing.
-
-Three.js 0.186.0 and fflate 0.8.3 are pinned CDN dependencies. The app is still static and has no build step or server-side storage.
+Version 1.2 Beta restored the Staff Overview with four job metrics and the six newest requests, removed the retired queue page from staff navigation, and streamlined the request wizard by removing layer-height and infill options. The Materials workspace supports adding, editing, and adjusting filament stock. The staff navigation includes Overview, My active jobs, Materials, and My Hours. Older `#/staff/queue` links redirect to the Staff Overview.
 
 ### Public homepage
 
-The homepage no longer includes the `01 / Capabilities`, `02 / Material Intelligence`, `03 / How It Works`, or `04 / Print Farm` sections. Their navigation and footer links, artwork, and section styles were removed.
-
-It keeps the **hero**, **use cases**, **FAQ**, and **request call to action**. Job submission and tracking remain available.
-
-The **FAQ** explains what filament is and compares the supported materials (**PLA**, **PETG**, **TPU**) by typical uses, behavior, and printing considerations. Its color and stock status list comes from the same inventory used by the request form.
+It provides basic information about the Print Farm's abilities, along with Q&A sections. 
 
 > [!NOTE]
 >
 > Material descriptions live in `src/data.js`. Live stock comes from `src/services.js`.
 
 ### Staff Portal
-
-Text, fields, navigation, tables, and buttons use larger, more consistent type, stronger contrast, and more comfortable spacing. The layout supports desktop, tablet, and smaller screens.
 
 The Overview shows four job counts—unclaimed, in progress, printing, and completed today—followed by a table of the six most recently submitted requests. Selecting a row opens its job details. The **My active jobs** page lists work assigned to the demo staff profile.
 
@@ -94,24 +72,6 @@ The **Materials** page can add and edit entries for PLA, PETG, and TPU, includin
 - Color, quantity, unit, low-stock threshold, availability, and notes.
 - Received-stock and consumption adjustments.
 - Status flags for **low stock**, **out of stock**, and **unavailable** entries.
-
-**Validation rules** (all enforced in the browser):
-
-- Duplicate material/color entries are rejected.
-- Negative quantities, unsupported units, and invalid updates are rejected.
-- Adjustments cannot reduce stock below zero.
-
-For a current quantity \(q\) and a consumption adjustment \(c\), an adjustment is accepted only if:
-
-\[
-q - c \ge 0
-\]
-
-A material/color combination is **selectable** in the request form only when:
-
-\[
-q > 0 \;\wedge\; \text{available} = \text{true}
-\]
 
 New installations start with an **empty inventory**, since the project contains no verified stock data. Staff must enter real stock before students can pick a material/color.
 
@@ -139,28 +99,9 @@ Teachers can add and edit student contribution records.
 | Duration | Positive, decimal hours allowed, at most 24 per record |
 | Activity | Description of the contribution |
 
-The page supports student search, date range filters, per-student totals, selected-period totals, and empty states. Totals are computed from saved records. For student \(s\) over a selected period \(P\), with record durations \(h_i\):
-
-\[
-T_{s,P} = \sum_{i \in R_{s,P}} h_i, \qquad 0 < h_i \le 24
-\]
-
-where \(R_{s,P}\) is the set of \(s\)'s records dated within \(P\).
-
 > [!NOTE]
 >
 > There is no student directory. Records use entered display names and suggest names from existing demo records. They do not create or connect real student accounts.
-
-### Browser verification performed for v1.1.1
-
-- Checked the updated homepage navigation and request wizard in a narrow browser viewport. The desktop header FAQ link and requested promotional copy are removed; FAQ content remains available through the existing footer route.
-- Loaded the official Three.js 3MF sample from a direct HTTPS URL, confirmed the geometry appeared in the preview, and dragged the viewport to orbit the model. An HTTP URL was rejected and the previous preview was cleared.
-- Exercised the same parser and preview module with browser-created STL, OBJ, and 3MF `File` objects, including uppercase extensions. Confirmed replacement disposes the prior preview, and malformed models plus empty, unsupported, oversized, and non-HTTPS inputs are rejected.
-- The native operating-system file chooser was not manually operated; local file parsing and rendering were covered through browser `File` objects.
-
-The project has no package manifest, automated test suite, build, lint, or type-check scripts. Node.js was unavailable in the verification environment, so no JavaScript build or command-line checks were run. Verification used the static HTTP server and browser.
-
-Direct-link loading depends on the host providing a downloadable file and permissive CORS headers; authenticated or private links cannot be fetched by this frontend-only demo. A production backend, real file storage, and printer workflow remain unavailable.
 
 ## Data, backend, and security limits
 
@@ -183,33 +124,6 @@ three-d-print-farm-demo-v3
 - `localStorage` is not a concurrency-safe database.
 
 A production deployment needs a backend, a configured database, and real staff/student authorization. No schema SQL or migration files were added because there is no database layer. That is an architecture limitation, not a database connection failure.
-
-## Testing
-
-There is no automated test suite or package manifest. A standalone JavaScript syntax check could not be run because Node.js was not installed in the verification environment.
-
-### Browser verification performed for v1.3
-
-- Checked all 12 accent and theme combinations, including that changing one preference preserves the other and both settings persist after reload and navigation.
-- Checked the public home, request wizard, and student job pages, plus staff overview, active jobs, materials, hours, material form, and job details.
-- Checked keyboard operation of the accent selector, responsive layout, and the light/dark favicon update.
-- Inspected browser console output; no errors or warnings appeared. `git diff --check` passed.
-
-The app modules were also loaded through the static HTTP server. No build, lint, or type-check scripts are configured in this repository.
-
-<details>
-<summary><b>Manual verification performed for v1.1</b></summary>
-
-- [x] Opened the homepage; confirmed the four removed sections and their navigation links are absent. Checked the filament FAQ's PLA, PETG, and TPU descriptions.
-- [x] Added a test inventory entry in an isolated preview, recorded consumption, and confirmed the low-stock status and quantity in the Staff Portal and public FAQ.
-- [x] Set that entry to unavailable in a second tab; the request form refreshed to an empty, disabled filament selection and blocked advancing with a stale selection.
-- [x] Submitted a test job with an available PLA/color entry; the saved job kept its material and color, and inventory quantity was unchanged. An over-consumption adjustment was rejected and stock remained unchanged.
-- [x] Added and edited a contribution record with decimal hours; checked student/date filtering and totals; the record persisted after reloading the isolated preview.
-- [x] Inspected browser console output during these workflows; no errors or warnings.
-
-**Not verifiable in this project:** a real backend workflow, authenticated staff access, cross-device persistence, and actual printer or file uploads.
-
-</details>
 
 ## Existing demo behavior and limits
 
@@ -242,7 +156,5 @@ The app modules were also loaded through the static HTTP server. No build, lint,
     ├── apiClient.js               # Inactive API placeholder (no network requests)
     └── styles.css                # Styles and responsive behavior
 ```
-
----
-
 <sub>For demonstration only. Do not use with real student data or production requests.</sub>
+---
