@@ -8,6 +8,10 @@
 ![storage](https://img.shields.io/badge/storage-browser%20localStorage-lightgrey)
 
 > **Beta prototype:** The identities and access controls are for demonstration only. Do not use this application with real student information, production requests, secured staff work, or authoritative stock records.
+> 
+## Upcoming Planned Updates
+
+Estimated Oct 24th, v1.5b: Proper implementation for Student Hours. Level 2-3 can check there own hours. Level 4 can add hours to Level 2-3s. 
 
 ## Release summary
 
