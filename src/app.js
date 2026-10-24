@@ -1,10 +1,10 @@
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=12";
-import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=12";
-import { notificationsService } from "./notificationsService.js?v=12";
-import { dateTime, esc, moneylessId } from "./pageShared.js?v=12";
-import { homePage } from "./publicPages.js?v=12";
-import { getStartedPage } from "./requestWizard.js?v=12";
-import { myJobsPage } from "./studentPages.js?v=12";
+import { contributionsService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=13";
+import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=13";
+import { notificationsService } from "./notificationsService.js?v=13";
+import { dateTime, esc, moneylessId } from "./pageShared.js?v=13";
+import { homePage } from "./publicPages.js?v=13";
+import { getStartedPage } from "./requestWizard.js?v=13";
+import { myJobsPage } from "./studentPages.js?v=13";
 import {
   activeJobsPage,
   jobDetailsPage,
@@ -13,7 +13,7 @@ import {
   staffMaterialForm,
   staffMaterials,
   staffOverview,
-} from "./staffPages.js?v=12";
+} from "./staffPages.js?v=13";
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
@@ -41,48 +41,34 @@ const state = {
   },
 };
 
-const THEME_STORAGE_KEY = "three-d-print-farm-theme";
 const ACCENT_STORAGE_KEY = "three-d-print-farm-accent";
 const ACCENT_IDS = new Set(["green", "blue", "purple", "teal", "orange", "rose"]);
 
 function syncAppearanceControls() {
   const root = document.documentElement;
+  root.dataset.theme = "dark";
   const accent = root.dataset.accent || "green";
-  const theme = root.dataset.theme || "dark";
   const names = { green: "Green", blue: "Blue", purple: "Purple", teal: "Teal", orange: "Orange", rose: "Rose" };
-  const next = theme === "light" ? "dark" : "light";
-  const label = next === "light" ? "Switch to light mode" : "Switch to dark mode";
   document.querySelectorAll(".accent-option").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.accent === accent)));
   document.querySelectorAll(".accent-picker summary").forEach((summary) => {
     summary.setAttribute("aria-label", "Choose accent color. Current color: " + (names[accent] || "Green"));
     summary.querySelector(".accent-picker-label").textContent = names[accent] || "Green";
   });
-  document.querySelectorAll(".theme-toggle").forEach((button) => {
-    button.setAttribute("aria-label", label);
-    button.title = label;
-    button.innerHTML = theme === "light"
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.4A8.4 8.4 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4Z"/></svg>'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>';
-  });
-  const styles = getComputedStyle(root);
-  const color = styles.getPropertyValue("--accent-primary").trim();
-  const background = styles.getPropertyValue("--bg").trim();
+  const color = getComputedStyle(root).getPropertyValue("--accent-primary").trim();
   const favicon = document.querySelector('link[rel="icon"]');
-  if (favicon && /^#[\da-f]{6}$/i.test(color) && /^#[\da-f]{6}$/i.test(background)) {
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><rect width="36" height="36" rx="7" fill="' + background + '"/><path d="M5 7h26v6H5zm0 9h20v6H5zm0 9h14v6H5z" fill="' + color + '"/></svg>';
+  if (favicon && /^#[\da-f]{6}$/i.test(color)) {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><rect width="36" height="36" rx="7" fill="#181818"/><path d="M5 7h26v6H5zm0 9h20v6H5zm0 9h14v6H5z" fill="' + color + '"/></svg>';
     favicon.href = "data:image/svg+xml," + encodeURIComponent(svg);
   }
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === "light" ? "#f3f5f1" : "#101310";
+  if (meta) meta.content = "#181818";
 }
 
-function applyAppearance({ theme, accent, persist = true } = {}) {
+function applyAppearance({ accent, persist = true } = {}) {
   const root = document.documentElement;
-  if (theme === "light" || theme === "dark") root.dataset.theme = theme;
   if (ACCENT_IDS.has(accent)) root.dataset.accent = accent;
   if (persist) {
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, root.dataset.theme || "dark");
       localStorage.setItem(ACCENT_STORAGE_KEY, root.dataset.accent || "green");
     } catch {
       // Keep the current page responsive when browser storage is unavailable.
@@ -160,13 +146,13 @@ async function render() {
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · 3D Print Farm";
+    document.title = "Staff Portal · School 3D Print Farm — v1.3.1b · Version 1.3.1 Beta";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · 3D Print Farm";
+    document.title = "Get Started · School 3D Print Farm — v1.3.1b · Version 1.3.1 Beta";
   } else if (route.page === "my-jobs") {
-    document.title = "My Jobs · 3D Print Farm";
+    document.title = "My Jobs · School 3D Print Farm — v1.3.1b · Version 1.3.1 Beta";
   } else {
-    document.title = "3D Print Farm";
+    document.title = "School 3D Print Farm Website — v1.3.1b · Version 1.3.1 Beta";
   }
 
   if (route.page === "home") {
@@ -195,7 +181,7 @@ async function render() {
     const selectedFile = state.wizard.modelFile;
     const stage = document.querySelector("#model-preview");
     try {
-      modelPreviewModule ||= await import("./modelPreview.js?v=12");
+      modelPreviewModule ||= await import("./modelPreview.js?v=13");
       if (revision !== renderRevision || selectedFile !== state.wizard.modelFile || !stage?.isConnected) return;
       await modelPreviewModule.mountModelPreview(stage, selectedFile, (status, message = "") => {
         if (revision !== renderRevision || selectedFile !== state.wizard.modelFile) return;
@@ -543,9 +529,10 @@ async function doAction(action, target) {
         target.closest(".accent-picker").open = false;
       }
       return;
-    } else if (action === "toggle-theme") {
-      applyAppearance({ theme: document.documentElement.dataset.theme === "light" ? "dark" : "light" });
-      return;
+    } else if (action === "inventory-toggle") {
+      const item = await inventoryService.toggleAvailability(id);
+      toast(`${item.material} · ${item.color} is now ${item.available ? "available" : "unavailable"}.`);
+      await render();
     } else if (action === "claim-job") {
       await jobsService.claimJob(id);
       toast("Job claimed and assigned to the demo staff profile.");
@@ -752,6 +739,13 @@ app.addEventListener("submit", async (event) => {
 app.addEventListener("input", (event) => {
   const target = event.target;
 
+  if (target.matches("[data-hex-input]")) {
+    const preview = target.form?.querySelector("[data-rgb-preview]");
+    const rgb = rgbFromHex(target.value);
+    if (preview) preview.textContent = rgb || "Enter a valid HEX value such as #2F80ED.";
+    target.setCustomValidity(target.value && !rgb ? "Use a six-digit HEX value in the format #RRGGBB." : "");
+  }
+
   if (target.matches("#model-link-url")) state.wizard.linkUrl = target.value;
 
   if (target.matches("[data-field]")) {
@@ -815,10 +809,9 @@ window.addEventListener("hashchange", () => {
 });
 
 window.addEventListener("storage", async (event) => {
-  if (event.key === THEME_STORAGE_KEY || event.key === ACCENT_STORAGE_KEY) {
+  if (event.key === ACCENT_STORAGE_KEY) {
     applyAppearance({
-      theme: event.key === THEME_STORAGE_KEY ? (event.newValue === "light" ? "light" : "dark") : undefined,
-      accent: event.key === ACCENT_STORAGE_KEY && ACCENT_IDS.has(event.newValue) ? event.newValue : undefined,
+      accent: ACCENT_IDS.has(event.newValue) ? event.newValue : "green",
       persist: false,
     });
     return;

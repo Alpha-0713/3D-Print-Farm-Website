@@ -3,32 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#101310" />
+    <meta name="theme-color" content="#181818" />
     <script>
       (() => {
         const accents = ["green", "blue", "purple", "teal", "orange", "rose"];
         try {
-          const theme = localStorage.getItem("three-d-print-farm-theme");
           const accent = localStorage.getItem("three-d-print-farm-accent");
-          document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
           document.documentElement.dataset.accent = accents.includes(accent) ? accent : "green";
         } catch {
-          document.documentElement.dataset.theme = "dark";
           document.documentElement.dataset.accent = "green";
         }
+        document.documentElement.dataset.theme = "dark";
       })();
     </script>
-    <meta name="description" content="3D Print Farm — a school 3D-printing service demo." />
-    <title>3D Print Farm</title>
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=12" />
-    <link rel="stylesheet" href="./src/styles.css?v=12" />
+    <meta name="description" content="School 3D Print Farm Website — a beta prototype for print requests and filament inventory." />
+    <meta name="version" content="v1.3.1b" />
+    <title>School 3D Print Farm Website — Version 1.3.1 Beta</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=13" />
+    <link rel="stylesheet" href="./src/styles.css?v=13" />
     <script type="importmap">{
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
       }
     }</script>
-    <script type="module" src="./src/app.js?v=12"></script>
+    <script type="module" src="./src/app.js?v=13"></script>
   </head>
   <body>
     <div id="app"></div>

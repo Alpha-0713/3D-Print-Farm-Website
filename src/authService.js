@@ -1,4 +1,4 @@
-import { DEMO_STAFF, DEMO_STUDENT } from "./data.js?v=12";
+import { DEMO_STAFF, DEMO_STUDENT } from "./data.js?v=13";
 
 export const authService = {
   mode: "mock",

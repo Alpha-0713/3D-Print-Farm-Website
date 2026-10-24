@@ -1,16 +1,16 @@
-import { MATERIALS } from "./data.js?v=12";
-import { esc, footer, publicHeader } from "./pageShared.js?v=12";
-import { partArtwork } from "./visualComponents.js?v=12";
+import { MATERIALS } from "./data.js?v=13";
+import { esc, footer, publicHeader } from "./pageShared.js?v=13";
+import { partArtwork } from "./visualComponents.js?v=13";
 
-const safeSwatch = (color) => (/^(#[\da-f]{3,8}|[a-z]{1,24})$/i.test(color) ? color : "#899080");
+const safeSwatch = (hexColor) => (/^#[\da-f]{6}$/i.test(hexColor || "") ? hexColor : "#2b2b2b");
 
 export function homePage(scrollTo = "", state, inventory = []) {
   const stockRows = inventory.length
     ? inventory.map((item) => {
-      const status = !item.available ? "Unavailable" : Number(item.quantity) <= 0 ? "Out of stock" : Number(item.quantity) <= Number(item.lowStockThreshold || 0) ? "Low stock" : "Available";
-      const isSelectable = item.available && Number(item.quantity) > 0;
+      const status = !item.hexColor ? "Color code needed" : !item.available ? "Unavailable" : Number(item.quantity) <= 0 ? "Out of stock" : Number(item.quantity) <= Number(item.lowStockThreshold || 0) ? "Low stock" : "Available";
+      const isSelectable = Boolean(item.hexColor) && item.available && Number(item.quantity) > 0;
       return `<li class="faq-stock-item">
-  <span class="filament-swatch" style="--filament-color:${safeSwatch(item.color)}" aria-hidden="true"></span>
+  <span class="filament-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${safeSwatch(item.hexColor)}" aria-hidden="true"></span>
   <span><strong>${esc(item.material)} · ${esc(item.color)}</strong><small>${esc(status)} · ${Number(item.quantity)} ${esc(item.unit)}${isSelectable ? " in inventory" : ""}</small></span>
 </li>`;
     }).join("")

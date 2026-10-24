@@ -1,7 +1,7 @@
-import { DEMO_STAFF, MATERIALS } from "./data.js?v=12";
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=12";
-import { notificationsService } from "./notificationsService.js?v=12";
-import { appearanceControls, dateTime, esc, logo, moneylessId, shortDate, statusBadge } from "./pageShared.js?v=12";
+import { DEMO_STAFF, MATERIALS } from "./data.js?v=13";
+import { contributionsService, inventoryService, jobsService } from "./services.js?v=13";
+import { notificationsService } from "./notificationsService.js?v=13";
+import { appearanceControls, dateTime, esc, logo, moneylessId, shortDate, statusBadge } from "./pageShared.js?v=13";
 
 function staffShell(content, active = "overview") {
   const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]];
@@ -236,17 +236,18 @@ ${jobs.length ? `<div class="active-jobs-grid">\
 
 export async function staffMaterials() {
   const inventory = await inventoryService.listInventory();
-  const entries = inventory.length ? `<div class="inventory-list" role="list">${inventory.map((item) => {
-    const status = inventoryService.status(item);
-    return `<div class="inventory-list-row" role="listitem">
-  <div class="inventory-list-name"><a href="#/staff/materials/${encodeURIComponent(item.id)}">${esc(item.material)} · ${esc(item.color)}</a><small>Open filament details ↗</small></div>
-  <div class="inventory-list-stock"><small>Remaining stock</small><strong>${Number(item.quantity)} <span>${esc(item.unit)}</span></strong></div>
-  <span class="inventory-status status-${status.toLowerCase().replaceAll(" ", "-")}">${esc(status)}</span>
-</div>`;
-  }).join("")}</div>` : `<div class="empty-state inventory-empty"><span>◇</span><h2>No filament inventory entries yet</h2><p>Add the stock that staff have verified. Starting inventory is empty so this demo does not assume quantities or colors.</p></div>`;
+  const entries = inventory.length ? `<div class="materials-grid" role="list">${inventory.map((item) => {
+    const available = item.available;
+    const code = item.hexColor ? `<div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(item.hexColor)}</code></div><div class="material-value"><span>RGB</span><code>${esc(item.rgbColor)}</code></div></div>` : `<div class="material-values"><div class="material-value"><span>HEX</span><code>Not set</code></div><div class="material-value"><span>RGB</span><code>Not set</code></div></div>`;
+    return `<article class="filament-inventory-card" role="listitem">
+  <span class="filament-inventory-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${item.hexColor || "transparent"}" aria-label="${item.hexColor ? `Filament color ${esc(item.color)}` : "Color code not set"}" role="img"></span>
+  <div class="filament-inventory-main"><div class="filament-inventory-title"><h3>${esc(item.material)}</h3><span>${esc(item.color)}</span></div><p class="filament-inventory-stock">${Number(item.quantity)} ${esc(item.unit)} in stock</p>${code}</div>
+  <div class="filament-inventory-actions"><button type="button" class="availability-toggle ${available ? "is-available" : "is-unavailable"}" data-action="inventory-toggle" data-id="${esc(item.id)}" aria-pressed="${available}" aria-label="Mark ${esc(item.material)} ${esc(item.color)} ${available ? "unavailable" : "available"}">${available ? "Available" : "Unavailable"}</button><a class="material-edit-link" href="#/staff/materials/${encodeURIComponent(item.id)}">${item.hexColor ? "Edit details" : "Set exact HEX"} ↗</a></div>
+</article>`;
+  }).join("")}</div>` : `<div class="empty-state inventory-empty"><span>◇</span><h2>No filament inventory entries yet</h2><p>Add verified filament stock and its exact HEX value. New installations start empty because the demo has no verified school inventory.</p></div>`;
 
-  return staffShell(`<div class="staff-page-heading inventory-page-heading"><div><span class="eyebrow">STAFF PORTAL / MATERIALS</span><h1>Materials</h1><p>Current filament stock at a glance.</p><a class="button button-lime" href="#/staff/materials/new">Add New Filament <span>＋</span></a></div></div>
-<section class="staff-section inventory-list-section"><div class="staff-section-head"><div><h2>Current inventory</h2><p>${inventory.length} filament ${inventory.length === 1 ? "entry" : "entries"}</p></div></div>${entries}</section>`, "materials");
+  return staffShell(`<div class="materials-page-top"><div><span class="eyebrow">STAFF PORTAL / MATERIALS</span><h1>Materials</h1><p>Filament colors, stock, and student availability.</p></div><a class="button button-lime" href="#/staff/materials/new">Add Filament <span>＋</span></a></div>
+<section class="materials-inventory"><div class="materials-inventory-head"><div><h2>Filament inventory</h2><p>${inventory.length} ${inventory.length === 1 ? "entry" : "entries"}</p></div></div>${entries}</section>`, "materials");
 }
 
 const inventoryStatusClass = (status) => `status-${status.toLowerCase().replaceAll(" ", "-")}`;
@@ -255,8 +256,10 @@ export function staffMaterialForm() {
   return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div>
 <div class="staff-page-heading"><div><span class="eyebrow">MATERIALS / NEW ENTRY</span><h1>Add New Filament</h1><p>Enter verified stock details for one material and color.</p></div></div>
 <section class="filament-panel filament-form-panel"><form class="inventory-add-form" data-form="inventory-add">
-  <label class="field"><span>Material <b>*</b></span><select name="material" required><option value="">Choose material</option>${MATERIALS.map((material) => `<option value="${esc(material.id)}">${esc(material.name)} · ${esc(material.descriptor)}</option>`).join("")}</select></label>
+  <label class="field"><span>Material type <b>*</b></span><select name="material" required><option value="">Choose material</option>${MATERIALS.map((material) => `<option value="${esc(material.id)}">${esc(material.name)} · ${esc(material.descriptor)}</option>`).join("")}</select></label>
   <label class="field"><span>Color name <b>*</b></span><input name="color" type="text" maxlength="60" placeholder="e.g. Matte black" required /></label>
+  <label class="field"><span>Exact HEX color <b>*</b></span><input name="hexColor" data-hex-input type="text" inputmode="text" autocomplete="off" placeholder="#2F80ED" pattern="^#[0-9A-Fa-f]{6}$" title="Use # followed by six hexadecimal digits" maxlength="7" required /><small>Use the verified filament color code.</small></label>
+  <div class="field"><span>RGB value</span><output class="color-input-preview" data-rgb-preview>Enter a six-digit HEX value.</output></div>
   <label class="field"><span>Initial stock <b>*</b></span><input name="quantity" type="number" min="0" step="0.01" value="0" required /></label>
   <label class="field"><span>Unit <b>*</b></span><select name="unit" data-inventory-unit required><option value="g">Grams (g)</option><option value="kg">Kilograms (kg)</option><option value="spools">Spools</option></select></label>
   <label class="field"><span>Low-stock threshold <b>*</b></span><input name="lowStockThreshold" type="number" min="0" step="0.01" value="100" required /><small>Uses the selected stock unit.</small></label>
@@ -275,10 +278,13 @@ export async function staffMaterialDetail(id) {
   return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div>
 <div class="filament-detail-heading"><div><span class="eyebrow">MATERIALS / FILAMENT DETAILS</span><h1>${esc(item.material)} · ${esc(item.color)}</h1><span class="inventory-status ${inventoryStatusClass(status)}">${esc(status)}</span></div><div class="filament-current-stock"><small>Current stock</small><strong>${Number(item.quantity)} <span>${esc(item.unit)}</span></strong></div></div>
 <div class="filament-detail-grid">
-  <section class="filament-panel"><div class="filament-panel-heading"><div><h2>Filament settings</h2><p>Update identity, availability, and low-stock alert.</p></div></div>
+  <section class="filament-panel"><div class="filament-panel-heading"><div><h2>Filament settings</h2><p>Update identity, exact color, availability, and low-stock alert.</p></div></div>
+    <div class="material-detail-color"><span class="filament-inventory-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${item.hexColor || "transparent"}" aria-hidden="true"></span><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(item.hexColor || "Set a verified value")}</code></div><div class="material-value"><span>RGB</span><code>${esc(item.rgbColor || "Calculated from HEX")}</code></div></div></div>
     <form class="inventory-edit-form" data-form="inventory-update" data-id="${esc(item.id)}"><div class="inventory-edit-grid">
-      <label class="field"><span>Material</span><select name="material" required>${MATERIALS.map((material) => `<option value="${esc(material.id)}" ${material.id === item.material ? "selected" : ""}>${esc(material.name)}</option>`).join("")}</select></label>
+      <label class="field"><span>Material type</span><select name="material" required>${MATERIALS.map((material) => `<option value="${esc(material.id)}" ${material.id === item.material ? "selected" : ""}>${esc(material.name)}</option>`).join("")}</select></label>
       <label class="field"><span>Color name</span><input name="color" type="text" maxlength="60" value="${esc(item.color)}" required /></label>
+      <label class="field"><span>Exact HEX color</span><input name="hexColor" data-hex-input type="text" maxlength="7" value="${esc(item.hexColor || "")}" pattern="^#[0-9A-Fa-f]{6}$" title="Use # followed by six hexadecimal digits" required /></label>
+      <div class="field"><span>RGB value</span><output class="color-input-preview" data-rgb-preview>${esc(item.rgbColor || "Enter the verified HEX value.")}</output></div>
       <label class="field"><span>Stock quantity</span><input name="quantity" type="number" min="0" step="0.01" value="${Number(item.quantity)}" required /></label>
       <label class="field"><span>Unit</span><select name="unit" data-inventory-unit required>${[["g", "Grams (g)"], ["kg", "Kilograms (kg)"], ["spools", "Spools"]].map(([value, label]) => `<option value="${value}" ${value === item.unit ? "selected" : ""}>${label}</option>`).join("")}</select></label>
       <label class="field"><span>Low-stock threshold</span><input name="lowStockThreshold" type="number" min="0" step="0.01" value="${Number(item.lowStockThreshold || 0)}" required /><small>Uses the selected stock unit.</small></label>

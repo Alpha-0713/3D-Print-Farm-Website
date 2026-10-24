@@ -1,6 +1,6 @@
-import { MATERIALS } from "./data.js?v=12";
-import { inventoryService } from "./services.js?v=12";
-import { esc, footer, moneylessId, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=12";
+import { MATERIALS } from "./data.js?v=13";
+import { inventoryService } from "./services.js?v=13";
+import { esc, footer, moneylessId, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=13";
 
 function stepIndicator(active) {
   const steps = [[1, "Upload model"], [2, "Print settings"], [3, "Project details"], [4, "Review & submit"]];
@@ -174,7 +174,7 @@ function wizardPanel(state, availableFilaments) {
     </select>\
     <small>Choose a combination staff have marked available in the current inventory.</small>\
   </label>\
-  ${selectedFilament ? `<div class="material-choice-detail full-field"><span class="filament-swatch" style="--filament-color:${/^(#[\\da-f]{3,8}|[a-z]{1,24})$/i.test(selectedFilament.color) ? selectedFilament.color : "#899080"}" aria-hidden="true"></span><div><strong>${esc(selectedFilament.material)} · ${esc(selectedFilament.color)}</strong><p>${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.description || "Supported print filament.")}</p><small>Good for: ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.uses || "Staff review required")} · ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.considerations || "Ask staff about printer compatibility.")} · ${Number(selectedFilament.quantity)} ${esc(selectedFilament.unit)} in inventory</small></div></div>` : `<div class="empty-inventory-note full-field"><strong>No filament is currently listed as available.</strong><p>Staff must enter a color and a positive stock amount in the Materials section before you can request it.</p></div>`}\
+  ${selectedFilament ? `<div class="material-choice-detail full-field"><span class="filament-swatch" style="--filament-color:${selectedFilament.hexColor || "#2b2b2b"}" aria-hidden="true"></span><div class="material-choice-copy"><strong>${esc(selectedFilament.material)} · ${esc(selectedFilament.color)}</strong><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(selectedFilament.hexColor || "Not set")}</code></div><div class="material-value"><span>RGB</span><code>${esc(selectedFilament.rgbColor || "Not set")}</code></div></div><p>${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.description || "Supported print filament.")}</p><small>Good for: ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.uses || "Staff review required")} · ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.considerations || "Ask staff about printer compatibility.")} · ${Number(selectedFilament.quantity)} ${esc(selectedFilament.unit)} in inventory</small></div></div>` : `<div class="empty-inventory-note full-field"><strong>No filament is currently listed as available.</strong><p>Staff must enter a color and a positive stock amount in the Materials section before you can request it.</p></div>`}\
 </div>\
 <div class="inventory-banner">\
   <span>\
