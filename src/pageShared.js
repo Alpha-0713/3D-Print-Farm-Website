@@ -1,3 +1,6 @@
+import { authService } from "./authService.js?v=14";
+import { PERMISSIONS, ROLES } from "./authorization.js?v=14";
+
 export const esc = (value = "") => String(value).replace(/[&<>"\x27]/g, (char) => ({
   "&": "&amp;",
   "<": "&lt;",
@@ -46,7 +49,33 @@ export function appearanceControls() {
     '<div class="accent-options" role="group" aria-label="Accent colors">' + options + '</div></details></div>';
 }
 
+export function roleSwitcher() {
+  const identity = authService.getCurrentIdentity();
+  const role = ROLES[identity.roleId];
+  const choices = authService.getDemoIdentities().map((choice) => {
+    const choiceRole = ROLES[choice.roleId];
+    const active = choice.roleId === identity.roleId;
+    return '<button type="button" class="role-switcher-option" data-action="switch-role" data-role-id="' + esc(choice.roleId) + '" aria-pressed="' + active + '">' +
+      '<span class="role-option-name">' + esc(choice.name) + (active ? '<small>Active</small>' : '') + '</span>' +
+      '<span class="role-option-role">' + esc(choiceRole.title) + '</span>' +
+      '<span class="role-option-level">Level ' + choiceRole.level + '</span>' +
+    '</button>';
+  }).join("");
+
+  return '<details class="role-switcher">' +
+    '<summary aria-label="Active demo identity: ' + esc(identity.name) + ', ' + esc(role.title) + ', Level ' + role.level + '">' +
+      '<span class="role-switcher-copy"><strong>' + esc(identity.name) + '</strong><small>' + esc(role.title) + ' · Level ' + role.level + '</small></span>' +
+      '<span class="role-switcher-caret" aria-hidden="true">⌄</span>' +
+    '</summary>' +
+    '<div class="role-switcher-menu"><span class="role-switcher-heading">DEMO IDENTITY</span>' +
+      choices +
+      '<p>Switching updates available pages and actions. This demo does not verify a Google account.</p>' +
+    '</div>' +
+  '</details>';
+}
+
 export function publicHeader(state) {
+  const canOpenStaff = authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW);
   const getStartedActive = location.hash === "#/get-started" ? 'aria-current="page"' : "";
 
   return `<header class="public-header">\
@@ -55,21 +84,23 @@ export function publicHeader(state) {
     <nav class="public-nav" id="public-nav" aria-label="Main navigation">\
       <div class="mobile-only-nav">\
         <a href="#/my-jobs">My Jobs</a>\
-        <a href="#/staff">Staff Portal</a>\
+        ${canOpenStaff ? '<a href="#/staff">Staff Portal</a>' : ""}\
       </div>\
     </nav>\
+    <button class="menu-toggle" type="button" aria-expanded="${state.menuOpen}" aria-controls="public-nav" data-action="menu-toggle" aria-label="${state.menuOpen ? "Close" : "Open"} navigation">${state.menuOpen ? "×" : "☰"}</button>\
     <div class="header-actions">\
       <a class="nav-quiet" href="#/my-jobs">My Jobs</a>\
-      <a class="nav-quiet staff-link" href="#/staff">Staff Portal</a>\
+      ${canOpenStaff ? '<a class="nav-quiet staff-link" href="#/staff">Staff Portal</a>' : ""}\
       ${appearanceControls()}\
       <a class="button button-lime button-small" href="#/get-started" ${getStartedActive}>Get Started <span aria-hidden="true">↗</span></a>\
+      ${roleSwitcher()}\
     </div>\
-    <button class="menu-toggle" type="button" aria-expanded="${state.menuOpen}" aria-controls="public-nav" data-action="menu-toggle" aria-label="${state.menuOpen ? "Close" : "Open"} navigation">${state.menuOpen ? "×" : "☰"}</button>\
   </div>\
 </header>`;
 }
 
 export function footer() {
+  const canOpenStaff = authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW);
   return `<footer class="site-footer">\
   <div class="footer-top">\
     ${logo()}\
@@ -78,7 +109,7 @@ export function footer() {
         <span class="eyebrow">Get started</span>\
         <a href="#/get-started">Submit a print request</a>\
         <a href="#/my-jobs">My Jobs</a>\
-        <a href="#/staff">Staff Portal</a>\
+        ${canOpenStaff ? '<a href="#/staff">Staff Portal</a>' : ""}\
       </div>\
       <div>\
         <span class="eyebrow">Contact</span>\
@@ -90,7 +121,7 @@ export function footer() {
   <div class="footer-bottom">\
     <span>© ${new Date().getFullYear()} 3D Print Farm</span>\
     <span>Files stay in your browser · no emails are sent</span>
-    <span>v1.3.1b · Version 1.3.1 Beta</span>\
+    <span>v1.4-beta · Version 1.4 Beta</span>\
   </div>\
 </footer>`;
 }

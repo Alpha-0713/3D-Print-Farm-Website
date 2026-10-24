@@ -1,10 +1,12 @@
-import { contributionsService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=13";
-import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=13";
-import { notificationsService } from "./notificationsService.js?v=13";
-import { dateTime, esc, moneylessId } from "./pageShared.js?v=13";
-import { homePage } from "./publicPages.js?v=13";
-import { getStartedPage } from "./requestWizard.js?v=13";
-import { myJobsPage } from "./studentPages.js?v=13";
+import { contributionsService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=14";
+import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=14";
+import { notificationsService } from "./notificationsService.js?v=14";
+import { dateTime, esc, moneylessId } from "./pageShared.js?v=14";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=14";
+import { authService, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=14";
+import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=14";
+import { getStartedPage } from "./requestWizard.js?v=14";
+import { myJobsPage } from "./studentPages.js?v=14";
 import {
   activeJobsPage,
   jobDetailsPage,
@@ -13,7 +15,7 @@ import {
   staffMaterialForm,
   staffMaterials,
   staffOverview,
-} from "./staffPages.js?v=13";
+} from "./staffPages.js?v=14";
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
@@ -143,16 +145,23 @@ async function render() {
     location.hash = "#/staff";
     return;
   }
+  const requiredPermission = ROUTE_PERMISSIONS[route.page];
+  if (requiredPermission && !authService.can(requiredPermission)) {
+    document.title = "Access restricted · 3D Print Farm · v1.4 Beta";
+    app.innerHTML = accessDeniedPage(state, requiredPermission);
+    window.scrollTo({ top: 0, behavior: "auto" });
+    return;
+  }
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v1.3.1b · Version 1.3.1 Beta";
+    document.title = "Staff Portal · School 3D Print Farm — v1.4-beta · Version 1.4 Beta";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v1.3.1b · Version 1.3.1 Beta";
+    document.title = "Get Started · School 3D Print Farm — v1.4-beta · Version 1.4 Beta";
   } else if (route.page === "my-jobs") {
-    document.title = "My Jobs · School 3D Print Farm — v1.3.1b · Version 1.3.1 Beta";
+    document.title = "My Jobs · School 3D Print Farm — v1.4-beta · Version 1.4 Beta";
   } else {
-    document.title = "School 3D Print Farm Website — v1.3.1b · Version 1.3.1 Beta";
+    document.title = "School 3D Print Farm Website — v1.4-beta · Version 1.4 Beta";
   }
 
   if (route.page === "home") {
@@ -181,7 +190,7 @@ async function render() {
     const selectedFile = state.wizard.modelFile;
     const stage = document.querySelector("#model-preview");
     try {
-      modelPreviewModule ||= await import("./modelPreview.js?v=13");
+      modelPreviewModule ||= await import("./modelPreview.js?v=14");
       if (revision !== renderRevision || selectedFile !== state.wizard.modelFile || !stage?.isConnected) return;
       await modelPreviewModule.mountModelPreview(stage, selectedFile, (status, message = "") => {
         if (revision !== renderRevision || selectedFile !== state.wizard.modelFile) return;
@@ -487,6 +496,12 @@ function openCompletionDialog(job) {
     const form = event.target;
     const submitButton = form.querySelector('[type="submit"]');
     if (submitButton.disabled) return;
+    if (!authService.can(PERMISSIONS.JOBS_MANAGE)) {
+      dialog.close();
+      dialog.remove();
+      toast("Access denied: this demo identity cannot manage print jobs.", "error");
+      return;
+    }
     submitButton.disabled = true;
 
     try {
@@ -521,9 +536,18 @@ function openCompletionDialog(job) {
 
 async function doAction(action, target) {
   const id = target.dataset.id;
+  const requiredPermission = ACTION_PERMISSIONS[action];
+  if (requiredPermission && !authService.can(requiredPermission)) {
+    toast("Access denied: this demo identity cannot " + (PERMISSION_LABELS[requiredPermission] || "perform that action") + ".", "error");
+    return;
+  }
 
   try {
-    if (action === "set-accent") {
+    if (action === "switch-role") {
+      target.closest(".role-switcher")?.removeAttribute("open");
+      if (!authService.switchRole(target.dataset.roleId)) throw new Error("That demonstration identity is unavailable.");
+      await render();
+    } else if (action === "set-accent") {
       if (ACCENT_IDS.has(target.dataset.accent)) {
         applyAppearance({ accent: target.dataset.accent });
         target.closest(".accent-picker").open = false;
@@ -535,7 +559,7 @@ async function doAction(action, target) {
       await render();
     } else if (action === "claim-job") {
       await jobsService.claimJob(id);
-      toast("Job claimed and assigned to the demo staff profile.");
+      toast("Job claimed and assigned to " + authService.getCurrentIdentity().name + ".");
       await render();
     } else if (action === "start-printing") {
       await jobsService.startPrinting(id);
@@ -684,6 +708,11 @@ app.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form).entries());
   const action = form.dataset.form;
+  const requiredPermission = FORM_PERMISSIONS[action];
+  if (requiredPermission && !authService.can(requiredPermission)) {
+    toast("Access denied: this demo identity cannot " + (PERMISSION_LABELS[requiredPermission] || "submit that form") + ".", "error");
+    return;
+  }
 
   if (action === "model-link") {
     await loadModelFromLink(values.modelUrl);
@@ -706,7 +735,11 @@ app.addEventListener("submit", async (event) => {
   if (submitButton) submitButton.disabled = true;
 
   try {
-    if (action === "inventory-add") {
+    if (action === "job-reassign") {
+      const job = await jobsService.reassignJob(form.dataset.id, values.assigneeRoleId);
+      await render();
+      toast("Job reassigned to " + job.assignedStaff + ".");
+    } else if (action === "inventory-add") {
       await inventoryService.add({ ...values, available: values.available === "true" });
       location.hash = "#/staff/materials";
       await render();
@@ -809,6 +842,10 @@ window.addEventListener("hashchange", () => {
 });
 
 window.addEventListener("storage", async (event) => {
+  if (event.key === DEMO_ROLE_STORAGE_KEY) {
+    await render();
+    return;
+  }
   if (event.key === ACCENT_STORAGE_KEY) {
     applyAppearance({
       accent: ACCENT_IDS.has(event.newValue) ? event.newValue : "green",

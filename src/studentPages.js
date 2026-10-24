@@ -1,6 +1,6 @@
-import { jobsService } from "./services.js?v=13";
-import { authService } from "./authService.js?v=13";
-import { esc, footer, moneylessId, publicHeader, shortDate, statusBadge } from "./pageShared.js?v=13";
+import { jobsService } from "./services.js?v=14";
+import { authService } from "./authService.js?v=14";
+import { esc, footer, moneylessId, publicHeader, shortDate, statusBadge } from "./pageShared.js?v=14";
 
 function jobCard(job, showAction = true) {
   return `<article class="job-card">\
@@ -40,7 +40,7 @@ function jobCard(job, showAction = true) {
 }
 
 export async function myJobsPage(state) {
-  const [jobs, student] = await Promise.all([jobsService.listMyJobs(), authService.getStudent()]);
+  const [jobs, student] = await Promise.all([jobsService.listMyJobs(), authService.getCurrentIdentity()]);
   return `${publicHeader(state)}\
 <main class="my-jobs page-shell">\
   <div class="page-title-row">\
@@ -48,7 +48,7 @@ export async function myJobsPage(state) {
       <span class="eyebrow">\
         <i>\
         </i>\
-         STUDENT PORTAL · DEMO\
+         DEMO PRINT REQUESTS\
       </span>\
       <h1>\
         My Jobs\
@@ -73,7 +73,7 @@ export async function myJobsPage(state) {
         ${esc(student.name)}\
       </strong>\
       <small>\
-        Mock identity · ${esc(student.email)}\
+        Demo identity · ${esc(student.email)}\
       </small>\
     </div>\
     <span class="demo-pill">\

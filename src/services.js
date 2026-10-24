@@ -1,13 +1,13 @@
 import {
-  DEMO_STAFF,
-  DEMO_STUDENT,
   MATERIALS,
   MOCK_JOBS,
   MOCK_NOTIFICATIONS,
   STATUSES,
-} from "./data.js?v=13";
-import { API_BASE_URL } from "./apiClient.js?v=13";
-import { filesService } from "./filesService.js?v=13";
+} from "./data.js?v=14";
+import { authService } from "./authService.js?v=14";
+import { getRole, PERMISSIONS } from "./authorization.js?v=14";
+import { API_BASE_URL } from "./apiClient.js?v=14";
+import { filesService } from "./filesService.js?v=14";
 
 const STORE_KEY = "three-d-print-farm-demo-v3";
 const DRAFT_KEY = "three-d-print-farm-draft-v2";
@@ -143,8 +143,8 @@ function formatFileSize(sizeBytes) {
 
 let state = readState();
 const nowIso = () => new Date().toISOString();
-const currentUser = DEMO_STUDENT;
-const currentStaff = DEMO_STAFF;
+const currentUser = () => authService.getCurrentIdentity();
+const currentStaff = () => authService.getCurrentIdentity();
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -209,7 +209,7 @@ export const jobsService = {
   async listMyJobs() {
     return clone(
       state.jobs
-        .filter((job) => job.submitterEmail === currentUser.email)
+        .filter((job) => job.submitterEmail === currentUser().email)
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
     );
   },
@@ -224,9 +224,9 @@ export const jobsService = {
       const job = {
         id,
         projectName: payload.projectName.trim(),
-        submitterName: currentUser.name,
-        submitterEmail: currentUser.email,
-        recipientEmail: currentUser.email,
+        submitterName: currentUser().name,
+        submitterEmail: currentUser().email,
+        recipientEmail: currentUser().email,
         fileName: payload.file.name,
         fileSize: formatFileSize(payload.file.sizeBytes),
         material: payload.material,
@@ -238,7 +238,7 @@ export const jobsService = {
         assignedStaff: null,
         pickupLocation: null,
         completedAt: null,
-        history: [{ type: "SUBMITTED", at: submittedAt, by: currentUser.name }],
+        history: [{ type: "SUBMITTED", at: submittedAt, by: currentUser().name }],
       };
       state.jobs.unshift(job);
       return job;
@@ -253,12 +253,34 @@ export const jobsService = {
         job.status === "SUBMITTED" && !job.assignedStaff,
         "This job is no longer available to claim.",
       );
-      job.assignedStaff = currentStaff.name;
+      job.assignedStaff = currentStaff().name;
       job.status = "IN_PROGRESS";
       job.history.push({
         type: "CLAIMED",
         at: nowIso(),
-        by: currentStaff.name,
+        by: currentStaff().name,
+      });
+      return job;
+    });
+  },
+  async reassignJob(jobId, targetRoleId) {
+    return update(() => {
+      assert(authService.can(PERMISSIONS.JOBS_REASSIGN), "Only the Level 4 Print Farm Teacher can reassign jobs.");
+      const targetIdentity = authService.getDemoIdentities().find((identity) => identity.roleId === targetRoleId);
+      const targetRole = getRole(targetRoleId);
+      assert(targetIdentity && targetRole && targetRole.level >= 2, "Choose a Level 2 or above staff member.");
+      const index = jobIndex(jobId);
+      assert(index >= 0, "Job not found.");
+      const job = state.jobs[index];
+      assert(job.status !== "COMPLETED", "Completed jobs cannot be reassigned.");
+      assert(job.assignedStaff, "Claim an unassigned job before reassigning it.");
+      assert(job.assignedStaff !== targetIdentity.name, "Choose a different staff member.");
+      job.assignedStaff = targetIdentity.name;
+      job.history.push({
+        type: "REASSIGNED",
+        at: nowIso(),
+        by: currentStaff().name,
+        assignedTo: targetIdentity.name,
       });
       return job;
     });
@@ -270,14 +292,14 @@ export const jobsService = {
       const job = state.jobs[index];
       assert(job.status === "IN_PROGRESS", "Only an in-progress job can advance to printing.");
       assert(
-        job.assignedStaff === currentStaff.name,
+        job.assignedStaff === currentStaff().name,
         "Only the assigned demo staff member can advance this job.",
       );
       job.status = "PRINTING";
       job.history.push({
         type: "PRINTING",
         at: nowIso(),
-        by: currentStaff.name,
+        by: currentStaff().name,
       });
       return job;
     });
@@ -289,7 +311,7 @@ export const jobsService = {
       const job = state.jobs[index];
       assert(job.status === "PRINTING", "Only a printing job can be completed.");
       assert(
-        job.assignedStaff === currentStaff.name,
+        job.assignedStaff === currentStaff().name,
         "Only the assigned demo staff member can complete this job.",
       );
       assert(
@@ -303,7 +325,7 @@ export const jobsService = {
       job.history.push({
         type: "COMPLETED",
         at: completedAt,
-        by: currentStaff.name,
+        by: currentStaff().name,
       });
       let notification = null;
       if (payload.notifyRecipient) {
@@ -321,7 +343,7 @@ export const jobsService = {
         job.history.push({
           type: "NOTIFICATION_SIMULATED",
           at: completedAt,
-          by: currentStaff.name,
+          by: currentStaff().name,
         });
       }
       return { job, notification };
@@ -367,7 +389,7 @@ export const jobsService = {
       job?.history.push({
         type: "NOTIFICATION_RETRIED_SIMULATED",
         at: item.retriedAt,
-        by: currentStaff.name,
+        by: currentStaff().name,
       });
       return item;
     });
@@ -400,7 +422,7 @@ export const jobsService = {
   async listMyActiveJobs() {
     return clone(
       state.jobs.filter((job) => (
-        job.assignedStaff === currentStaff.name && job.status !== "COMPLETED"
+        job.assignedStaff === currentStaff().name && job.status !== "COMPLETED"
       )),
     );
   },
@@ -436,10 +458,10 @@ export const jobsService = {
     }
   },
   currentStudent() {
-    return clone(currentUser);
+    return clone(currentUser());
   },
   currentStaff() {
-    return clone(currentStaff);
+    return clone(currentStaff());
   },
   availableStatuses() {
     return [...STATUSES];
@@ -522,7 +544,7 @@ export const inventoryService = {
       const item = {
         id: localId("FIL"),
         ...normalized,
-        adjustments: [{ type: "initial", delta: normalized.quantity, note: "Initial stock", at: timestamp, by: currentStaff.name }],
+        adjustments: [{ type: "initial", delta: normalized.quantity, note: "Initial stock", at: timestamp, by: currentStaff().name }],
         createdAt: timestamp,
         updatedAt: timestamp,
       };
@@ -556,7 +578,7 @@ export const inventoryService = {
           delta: normalized.quantity - previousQuantity,
           note: "Quantity changed in inventory form",
           at: item.updatedAt,
-          by: currentStaff.name,
+          by: currentStaff().name,
         });
       }
       return item;
@@ -588,7 +610,7 @@ export const inventoryService = {
         delta,
         note: String(payload.note || "").trim().slice(0, 120),
         at: item.updatedAt,
-        by: currentStaff.name,
+        by: currentStaff().name,
       });
       return item;
     });
@@ -626,7 +648,7 @@ export const contributionsService = {
       const normalized = { ...payload, student: String(payload.student || "").trim(), date: String(payload.date || ""), hours: Number(payload.hours), activity: String(payload.activity || "").trim() };
       validateContribution(normalized);
       const timestamp = nowIso();
-      const record = { id: localId("HRS"), ...normalized, createdAt: timestamp, updatedAt: timestamp, createdBy: currentStaff.name };
+      const record = { id: localId("HRS"), ...normalized, createdAt: timestamp, updatedAt: timestamp, createdBy: currentStaff().name };
       state.contributions.unshift(record);
       return record;
     });

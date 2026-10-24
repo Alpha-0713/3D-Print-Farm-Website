@@ -1,10 +1,12 @@
-import { DEMO_STAFF, MATERIALS } from "./data.js?v=13";
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=13";
-import { notificationsService } from "./notificationsService.js?v=13";
-import { appearanceControls, dateTime, esc, logo, moneylessId, shortDate, statusBadge } from "./pageShared.js?v=13";
+import { MATERIALS } from "./data.js?v=14";
+import { contributionsService, inventoryService, jobsService } from "./services.js?v=14";
+import { notificationsService } from "./notificationsService.js?v=14";
+import { appearanceControls, dateTime, esc, logo, moneylessId, roleSwitcher, shortDate, statusBadge } from "./pageShared.js?v=14";
+import { authService } from "./authService.js?v=14";
+import { PERMISSIONS, ROLES } from "./authorization.js?v=14";
 
 function staffShell(content, active = "overview") {
-  const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]];
+  const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "My Hours", "◴", "#/staff/hours"]].filter(([id]) => id !== "materials" || authService.can(PERMISSIONS.FILAMENT_VIEW));
   const pageLabel = ({ overview: "Overview", active: "My active jobs", materials: "Materials", "material-new": "Add filament", hours: "My Hours" })[active] || "Staff Portal";
   return `<div class="staff-app">\
   <aside class="staff-sidebar">\
@@ -20,21 +22,6 @@ function staffShell(content, active = "overview") {
 </a>`).join("")}\
     </nav>\
     <div class="sidebar-bottom">\
-      <div class="staff-identity">\
-        <span class="avatar">\
-          JL\
-        </span>\
-        <div>\
-          <strong>\
-            ${DEMO_STAFF.name}\
-          </strong>\
-          <small>\
-            Mock staff identity\
-          </small>\
-        </div>\
-        <span class="online-dot">\
-        </span>\
-      </div>\
       <a class="back-public" href="#/">\
         ← Back to public website\
       </a>\
@@ -60,10 +47,8 @@ function staffShell(content, active = "overview") {
         <span class="top-date">\
           ${new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}\
         </span>\
-        <span class="avatar">\
-          JL\
-        </span>\
-      </div>\
+        ${roleSwitcher()}\
+        </div>\
     </header>\
     <div class="staff-content">\
       ${content}\
@@ -173,6 +158,7 @@ export async function staffOverview() {
 
 export async function activeJobsPage() {
   const jobs = await jobsService.listMyActiveJobs();
+  const identity = authService.getCurrentIdentity();
   return staffShell(`<div class="staff-page-heading">\
   <div>\
     <span class="eyebrow">\
@@ -186,7 +172,7 @@ export async function activeJobsPage() {
     </p>\
   </div>\
   <span class="demo-pill">\
-    ${esc(DEMO_STAFF.name)} · DEMO\
+    ${esc(identity.name)} · DEMO\
   </span>\
 </div>\
 ${jobs.length ? `<div class="active-jobs-grid">\
@@ -236,17 +222,18 @@ ${jobs.length ? `<div class="active-jobs-grid">\
 
 export async function staffMaterials() {
   const inventory = await inventoryService.listInventory();
+  const canChangeFilament = authService.can(PERMISSIONS.FILAMENT_CHANGE);
   const entries = inventory.length ? `<div class="materials-grid" role="list">${inventory.map((item) => {
     const available = item.available;
     const code = item.hexColor ? `<div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(item.hexColor)}</code></div><div class="material-value"><span>RGB</span><code>${esc(item.rgbColor)}</code></div></div>` : `<div class="material-values"><div class="material-value"><span>HEX</span><code>Not set</code></div><div class="material-value"><span>RGB</span><code>Not set</code></div></div>`;
     return `<article class="filament-inventory-card" role="listitem">
   <span class="filament-inventory-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${item.hexColor || "transparent"}" aria-label="${item.hexColor ? `Filament color ${esc(item.color)}` : "Color code not set"}" role="img"></span>
   <div class="filament-inventory-main"><div class="filament-inventory-title"><h3>${esc(item.material)}</h3><span>${esc(item.color)}</span></div><p class="filament-inventory-stock">${Number(item.quantity)} ${esc(item.unit)} in stock</p>${code}</div>
-  <div class="filament-inventory-actions"><button type="button" class="availability-toggle ${available ? "is-available" : "is-unavailable"}" data-action="inventory-toggle" data-id="${esc(item.id)}" aria-pressed="${available}" aria-label="Mark ${esc(item.material)} ${esc(item.color)} ${available ? "unavailable" : "available"}">${available ? "Available" : "Unavailable"}</button><a class="material-edit-link" href="#/staff/materials/${encodeURIComponent(item.id)}">${item.hexColor ? "Edit details" : "Set exact HEX"} ↗</a></div>
+  <div class="filament-inventory-actions">${authService.can(PERMISSIONS.FILAMENT_CHANGE) ? `<button type="button" class="availability-toggle ${available ? "is-available" : "is-unavailable"}" data-action="inventory-toggle" data-id="${esc(item.id)}" aria-pressed="${available}" aria-label="Mark ${esc(item.material)} ${esc(item.color)} ${available ? "unavailable" : "available"}">${available ? "Available" : "Unavailable"}</button>` : `<span class="availability-toggle is-readonly">${available ? "Available" : "Unavailable"}</span>`}<a class="material-edit-link" href="#/staff/materials/${encodeURIComponent(item.id)}">${authService.can(PERMISSIONS.FILAMENT_CHANGE) ? (item.hexColor ? "Edit details" : "Set exact HEX") : "View details"} ↗</a></div>
 </article>`;
   }).join("")}</div>` : `<div class="empty-state inventory-empty"><span>◇</span><h2>No filament inventory entries yet</h2><p>Add verified filament stock and its exact HEX value. New installations start empty because the demo has no verified school inventory.</p></div>`;
 
-  return staffShell(`<div class="materials-page-top"><div><span class="eyebrow">STAFF PORTAL / MATERIALS</span><h1>Materials</h1><p>Filament colors, stock, and student availability.</p></div><a class="button button-lime" href="#/staff/materials/new">Add Filament <span>＋</span></a></div>
+  return staffShell(`<div class="materials-page-top"><div><span class="eyebrow">STAFF PORTAL / MATERIALS</span><h1>Materials</h1><p>Filament colors, stock, and student availability.</p></div>${canChangeFilament ? '<a class="button button-lime" href="#/staff/materials/new">Add Filament <span>＋</span></a>' : ""}</div>
 <section class="materials-inventory"><div class="materials-inventory-head"><div><h2>Filament inventory</h2><p>${inventory.length} ${inventory.length === 1 ? "entry" : "entries"}</p></div></div>${entries}</section>`, "materials");
 }
 
@@ -273,6 +260,16 @@ export async function staffMaterialDetail(id) {
   const item = await inventoryService.getItem(id);
   if (!item) return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div><div class="empty-state"><span>◇</span><h2>Filament not found</h2><p>This inventory entry may have been removed or the link is invalid.</p><a class="button button-outline" href="#/staff/materials">Back to current inventory</a></div>`, "materials");
   const status = inventoryService.status(item);
+  if (!authService.can(PERMISSIONS.FILAMENT_CHANGE)) {
+    const readOnlyHistory = (item.adjustments || []).slice(0, 8).map((entry) =>
+      '<div class="filament-adjustment-row"><span>' + esc(entry.type === "receive" ? "Stock received" : entry.type === "consume" ? "Stock consumed" : entry.type === "initial" ? "Initial stock" : "Stock updated") + '</span><b>' + (Number(entry.delta) > 0 ? "+" : "") + Number(entry.delta) + " " + esc(item.unit) + "</b></div>"
+    ).join("");
+    const readOnlyDetails = '<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div>' +
+      '<div class="filament-detail-heading"><div><span class="eyebrow">MATERIALS / READ ONLY</span><h1>' + esc(item.material) + " · " + esc(item.color) + '</h1><span class="inventory-status ' + inventoryStatusClass(status) + '">' + esc(status) + '</span></div><div class="filament-current-stock"><small>Current stock</small><strong>' + Number(item.quantity) + " <span>" + esc(item.unit) + "</span></strong></div></div>" +
+      '<section class="filament-panel"><h2>Filament details</h2><div class="material-detail-color"><span class="filament-inventory-swatch" style="--filament-color:' + (item.hexColor || "transparent") + '" aria-hidden="true"></span><div class="material-values"><div class="material-value"><span>HEX</span><code>' + esc(item.hexColor || "Not set") + '</code></div><div class="material-value"><span>RGB</span><code>' + esc(item.rgbColor || "Not set") + '</code></div></div></div><p>Availability: ' + (item.available ? "Available to students" : "Unavailable to students") + '</p><p>Changing filament details and stock is available to Level 3 and above.</p></section>' +
+      '<section class="filament-panel"><h2>Recent stock activity</h2>' + (readOnlyHistory || '<p class="filament-muted">No stock changes recorded yet.</p>') + "</section>";
+    return staffShell(readOnlyDetails, "materials");
+  }
   const adjustments = (item.adjustments || []).slice(0, 8);
   const adjustmentRows = adjustments.length ? `<div class="filament-adjustment-list">${adjustments.map((entry) => `<div class="filament-adjustment-row"><span class="adjustment-mark ${Number(entry.delta) >= 0 ? "is-positive" : "is-negative"}" aria-hidden="true">${Number(entry.delta) > 0 ? "+" : Number(entry.delta) < 0 ? "−" : "•"}</span><div><strong>${esc(entry.type === "initial" ? "Initial stock" : entry.type === "set" ? "Stock updated" : entry.type === "receive" ? "Stock received" : "Stock consumed")}</strong><small>${dateTime(entry.at)}${entry.note ? ` · ${esc(entry.note)}` : ""}</small></div><b>${Number(entry.delta) > 0 ? "+" : ""}${Number(entry.delta)} ${esc(item.unit)}</b></div>`).join("")}</div>` : `<p class="filament-muted">No stock changes recorded yet.</p>`;
   return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div>
@@ -322,7 +319,7 @@ export async function staffHours(filters = {}, editingId = "") {
 }
 
 function historyLabel(event) {
-  return ({ SUBMITTED: "Request submitted", CLAIMED: "Job claimed", PRINTING: "Marked as printing", COMPLETED: "Marked as completed", NOTIFICATION_SIMULATED: "Pickup notification simulated", NOTIFICATION_RETRIED_SIMULATED: "Notification retry simulated" })[event.type] || event.type;
+  return ({ SUBMITTED: "Request submitted", CLAIMED: "Job claimed", PRINTING: "Marked as printing", COMPLETED: "Marked as completed", NOTIFICATION_SIMULATED: "Pickup notification simulated", NOTIFICATION_RETRIED_SIMULATED: "Notification retry simulated", REASSIGNED: "Job reassigned" })[event.type] || event.type;
 }
 
 export async function jobDetailsPage(jobId) {
@@ -346,17 +343,34 @@ export async function jobDetailsPage(jobId) {
   <span>\
     →\
   </span>\
-</button>` : job.status === "IN_PROGRESS" && job.assignedStaff === DEMO_STAFF.name ? `<button class="button button-lime" data-action="start-printing" data-id="${esc(job.id)}">\
+</button>` : job.status === "IN_PROGRESS" && job.assignedStaff === authService.getCurrentIdentity().name ? `<button class="button button-lime" data-action="start-printing" data-id="${esc(job.id)}">\
   Mark as Printing \
   <span>\
     →\
   </span>\
-</button>` : job.status === "PRINTING" && job.assignedStaff === DEMO_STAFF.name ? `<button class="button button-lime" data-action="complete-job" data-id="${esc(job.id)}">\
+</button>` : job.status === "PRINTING" && job.assignedStaff === authService.getCurrentIdentity().name ? `<button class="button button-lime" data-action="complete-job" data-id="${esc(job.id)}">\
   Mark as Completed \
   <span>\
     ✓\
   </span>\
 </button>` : "";
+  const canReassign = authService.can(PERMISSIONS.JOBS_REASSIGN);
+  const reassignTargets = authService.getDemoIdentities().filter((identity) => (
+    ROLES[identity.roleId]?.level >= 2 && identity.name !== job.assignedStaff
+  ));
+  const reassignForm = canReassign && job.status !== "COMPLETED" && job.assignedStaff && reassignTargets.length
+    ? `<section class="detail-section job-reassignment">
+  <h2>Reassign task</h2>
+  <p>Choose a different Level 2 or above member for this job.</p>
+  <form class="job-reassignment-form" data-form="job-reassign" data-id="${esc(job.id)}">
+    <label class="field"><span>New assignee</span><select name="assigneeRoleId" required>${reassignTargets.map((identity) => {
+      const role = ROLES[identity.roleId];
+      return `<option value="${esc(identity.roleId)}">${esc(identity.name)} · ${esc(role.title)} (Level ${role.level})</option>`;
+    }).join("")}</select></label>
+    <button class="button button-lime button-small" type="submit">Reassign task</button>
+  </form>
+</section>`
+    : "";
   const notificationRows = notifications.length ? `<section class="detail-section">\
   <div class="staff-section-head">\
     <div>\
@@ -480,6 +494,7 @@ export async function jobDetailsPage(jobId) {
   </small>\
 </div>` : ""}\
     </section>\
+    ${reassignForm}\
     ${notificationRows}\
   </div>\
   <aside class="detail-aside">\
@@ -496,7 +511,7 @@ export async function jobDetailsPage(jobId) {
       ${historyLabel(event)}\
     </strong>\
     <small>\
-      ${esc(event.by)} · ${dateTime(event.at)}\
+      ${esc(event.assignedTo ? `${event.by} → ${event.assignedTo}` : event.by)} · ${dateTime(event.at)}\
     </small>\
   </div>\
 </div>`).join("")}\

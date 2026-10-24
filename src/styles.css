@@ -854,7 +854,7 @@ option { color:var(--text); background:var(--surface); }
 .sidebar-link.selected, .sidebar-link.selected > span { color:var(--accent-foreground); }
 
 
-/* v1.3.1b materials inventory */
+/* v1.4-beta materials inventory */
 .materials-page-top { display:flex; align-items:end; justify-content:space-between; gap:24px; margin:0 0 22px; }
 .materials-page-top h1 { margin:6px 0 5px; color:var(--text-strong); font-size:clamp(30px,4vw,42px); font-weight:560; letter-spacing:-.05em; }
 .materials-page-top p { margin:0; color:var(--muted); font-size:13px; }
@@ -899,4 +899,52 @@ option { color:var(--text); background:var(--surface); }
   .availability-toggle { justify-content:center; }
   .material-edit-link { align-self:center; }
   .material-detail-color { align-items:flex-start; flex-direction:column; }
+}
+
+
+/* Demonstration identity switcher and intentional access-denied state */
+.role-switcher { position: relative; z-index: 25; flex: 0 0 auto; }
+.role-switcher > summary { min-height: 38px; max-width: 205px; padding: 5px 9px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--border); background: var(--surface-raised); cursor: pointer; list-style: none; }
+.role-switcher > summary::-webkit-details-marker { display: none; }
+.role-switcher > summary:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.role-switcher-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.role-switcher-copy strong { overflow: hidden; color: var(--text); font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.role-switcher-copy small { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.role-switcher-caret { color: var(--accent-primary); font-size: 15px; line-height: 1; }
+.role-switcher-menu { width: min(330px, calc(100vw - 24px)); position: absolute; top: calc(100% + 7px); right: 0; padding: 9px; border: 1px solid var(--border-strong); background: var(--surface-raised); box-shadow: 0 16px 38px var(--shadow-color); }
+.role-switcher-heading { display: block; padding: 5px 8px 9px; color: var(--quiet); font-size: 8px; font-weight: 700; letter-spacing: .12em; }
+.role-switcher-option { width: 100%; padding: 9px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; border: 1px solid transparent; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.role-switcher-option:hover, .role-switcher-option[aria-pressed="true"] { border-color: var(--accent-border); background: var(--accent-tint); }
+.role-option-name { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 650; }
+.role-option-name small { padding: 2px 5px; border: 1px solid var(--accent-border); color: var(--accent-primary); font-size: 7px; letter-spacing: .06em; text-transform: uppercase; }
+.role-option-role { grid-column: 1; color: var(--muted); font-size: 9px; }
+.role-option-level { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--accent-primary); font-size: 9px; font-weight: 650; white-space: nowrap; }
+.role-switcher-menu > p { margin: 8px 8px 4px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 8px; line-height: 1.5; }
+.availability-toggle.is-readonly { cursor: default; }
+.access-denied { min-height: 56vh; padding-top: 90px; padding-bottom: 90px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+.access-denied h1 { margin: 14px 0 10px; font-size: clamp(42px, 6vw, 72px); line-height: 1; letter-spacing: -.055em; }
+.access-denied > p { max-width: 620px; color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
+.access-denied .hero-actions { margin-top: 12px; }
+@media (max-width: 767px) {
+  .role-switcher > summary { min-height: 34px; max-width: 94px; padding: 4px 6px; gap: 4px; }
+  .role-switcher-copy strong { max-width: 69px; font-size: 9px; }
+  .role-switcher-copy small { display: none; }
+  .role-switcher-caret { font-size: 12px; }
+  .staff-topbar .role-switcher > summary { max-width: 150px; }
+  .staff-topbar .role-switcher-copy small { display: block; font-size: 7px; }
+  .access-denied { min-height: 55vh; padding-top: 58px; padding-bottom: 58px; }
+}
+
+
+/* Level 4 job reassignment */
+.job-reassignment > h2 { margin: 14px 0 5px; font-size: 14px; font-weight: 560; }
+.job-reassignment > p { margin: 0 0 12px; color: var(--muted); font-size: 10px; }
+.job-reassignment-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 11px; }
+@media (max-width: 560px) { .job-reassignment-form { grid-template-columns: 1fr; } .job-reassignment-form .button { width: 100%; } }
+@media (max-width:390px) {
+  .header-inner { gap:6px; padding:0 4%; }
+  .header-actions { gap:5px; }
+  .header-actions .button { padding:0 7px; }
+  .public-header .role-switcher > summary { max-width:72px; padding:4px; gap:2px; }
+  .public-header .role-switcher-copy strong { max-width:44px; font-size:8px; }
 }

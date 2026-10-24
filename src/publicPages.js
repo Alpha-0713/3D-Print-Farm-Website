@@ -1,6 +1,8 @@
-import { MATERIALS } from "./data.js?v=13";
-import { esc, footer, publicHeader } from "./pageShared.js?v=13";
-import { partArtwork } from "./visualComponents.js?v=13";
+import { MATERIALS } from "./data.js?v=14";
+import { esc, footer, publicHeader } from "./pageShared.js?v=14";
+import { PERMISSION_LABELS } from "./authorization.js?v=14";
+import { authService } from "./authService.js?v=14";
+import { partArtwork } from "./visualComponents.js?v=14";
 
 const safeSwatch = (hexColor) => (/^#[\da-f]{6}$/i.test(hexColor || "") ? hexColor : "#2b2b2b");
 
@@ -87,6 +89,22 @@ export function homePage(scrollTo = "", state, inventory = []) {
     <div><span class="eyebrow">YOUR NEXT GREAT THING STARTS WITH A FILE.</span><h2>Let's give your<br />idea some form.</h2></div>
     <div><p>Have a file? Start a request. A member of the school team can review the details.</p><a class="button button-dark" href="#/get-started">Get Started <span>↗</span></a></div>
   </section>
+</main>
+${footer()}`;
+}
+
+
+export function accessDeniedPage(state, permission) {
+  const role = authService.getCurrentRole();
+  const identity = authService.getCurrentIdentity();
+  const requestedFeature = PERMISSION_LABELS[permission] || "opening this page";
+  return `${publicHeader(state)}
+<main class="access-denied page-shell">
+  <span class="eyebrow">DEMO ACCESS CONTROL</span>
+  <h1>Access restricted</h1>
+  <p><strong>${esc(identity.name)}</strong> · ${esc(role.title)} · Level ${role.level} does not have permission for ${esc(requestedFeature)}.</p>
+  <p>Choose another demonstration identity from the selector in the header to preview its available pages and actions.</p>
+  <div class="hero-actions"><a class="button button-outline" href="#/">Return to the public website</a><a class="button button-lime" href="#/get-started">Submit a print request</a></div>
 </main>
 ${footer()}`;
 }
