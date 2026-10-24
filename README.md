@@ -6,7 +6,6 @@
 
 ![version](https://img.shields.io/badge/version-1.3-blue)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JS-f7df1e?logo=javascript&logoColor=black)
-![backend](https://img.shields.io/badge/backend-none-lightgrey)
 ![storage](https://img.shields.io/badge/storage-localStorage-orange)
 
 ---
