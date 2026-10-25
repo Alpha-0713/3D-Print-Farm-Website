@@ -1,5 +1,5 @@
-import { authService } from "./authService.js?v=19";
-import { PERMISSIONS, ROLES } from "./authorization.js?v=19";
+import { authService } from "./authService.js?v=20";
+import { PERMISSIONS, ROLES } from "./authorization.js?v=20";
 
 export const esc = (value = "") => String(value).replace(/[&<>"\x27]/g, (char) => ({
   "&": "&amp;",
@@ -136,7 +136,7 @@ export function footer() {
   <div class="footer-bottom">\
     <span>© ${new Date().getFullYear()} 3D Print Farm</span>\
     <span>Files stay in your browser · no emails are sent</span>
-    <span>v1.5-beta · Version 1.5 Beta</span>\
+    <span>v1.6-beta · Version 1.6 Beta</span>\
   </div>\
 </footer>`;
 }

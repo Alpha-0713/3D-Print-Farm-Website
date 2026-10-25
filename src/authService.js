@@ -1,4 +1,4 @@
-import { getRole, hasPermission } from "./authorization.js?v=19";
+import { getRole, hasPermission } from "./authorization.js?v=20";
 
 export const DEMO_ROLE_STORAGE_KEY = "three-d-print-farm-demo-role";
 export const DEMO_ACCOUNTS_STORAGE_KEY = "three-d-print-farm-demo-accounts";

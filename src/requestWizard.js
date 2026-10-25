@@ -1,6 +1,5 @@
-import { MATERIALS } from "./data.js?v=19";
-import { inventoryService } from "./services.js?v=19";
-import { esc, footer, printNumber, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=19";
+import { inventoryService } from "./services.js?v=20";
+import { esc, footer, printNumber, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=20";
 
 function stepIndicator(active) {
   const steps = [[1, "Upload model"], [2, "Print settings"], [3, "Project details"], [4, "Review & submit"]];
@@ -170,11 +169,11 @@ function wizardPanel(state, availableFilaments) {
   <label class="field full-field">\
     <span>Available filament <b>*</b></span>\
     <select name="inventoryId" data-field="inventoryId" ${availableFilaments.length ? "required" : "disabled"}>\
-      ${availableFilaments.length ? availableFilaments.map((item) => `<option value="${esc(item.id)}" ${item.id === w.inventoryId ? "selected" : ""}>${esc(item.material)} · ${esc(item.color)} — ${Number(item.quantity)} ${esc(item.unit)} in stock</option>`).join("") : "<option value=\"\">No material and color combinations are currently available</option>"}\
+      ${availableFilaments.length ? availableFilaments.map((item) => `<option value="${esc(item.id)}" ${item.id === w.inventoryId ? "selected" : ""}>${esc(item.material)} · ${esc(item.color)} — Available${item.lowStock ? " · Low stock" : ""}</option>`).join("") : "<option value=\"\">No material and color combinations are currently available</option>"}\
     </select>\
-    <small>Choose a combination staff have marked available in the current inventory.</small>\
+    <small>Only filaments staff have marked Available can be selected.</small>\
   </label>\
-  ${selectedFilament ? `<div class="material-choice-detail full-field"><span class="filament-swatch" style="--filament-color:${selectedFilament.hexColor || "#2b2b2b"}" aria-hidden="true"></span><div class="material-choice-copy"><strong>${esc(selectedFilament.material)} · ${esc(selectedFilament.color)}</strong><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(selectedFilament.hexColor || "Not set")}</code></div><div class="material-value"><span>RGB</span><code>${esc(selectedFilament.rgbColor || "Not set")}</code></div></div><p>${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.description || "Supported print filament.")}</p><small>Good for: ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.uses || "Staff review required")} · ${esc(MATERIALS.find((item) => item.id === selectedFilament.material)?.considerations || "Ask staff about printer compatibility.")} · ${Number(selectedFilament.quantity)} ${esc(selectedFilament.unit)} in inventory</small></div></div>` : `<div class="empty-inventory-note full-field"><strong>No filament is currently listed as available.</strong><p>Staff must enter a color and a positive stock amount in the Materials section before you can request it.</p></div>`}\
+  ${selectedFilament ? `<div class="material-choice-detail full-field"><span class="filament-swatch" style="--filament-color:${selectedFilament.hexColor || "#2b2b2b"}" role="img" aria-label="${esc(selectedFilament.color)} filament color"></span><div class="material-choice-copy"><strong>${esc(selectedFilament.material)} · ${esc(selectedFilament.color)}</strong><div class="request-filament-status"><span class="filament-status-label is-available">Available for new requests</span>${selectedFilament.lowStock ? '<span class="filament-status-label is-low-stock">Low stock · still available to request</span>' : ""}</div><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(selectedFilament.hexColor)}</code></div><div class="material-value"><span>RGB</span><code>${esc(selectedFilament.rgbColor)}</code></div></div></div></div>` : `<div class="empty-inventory-note full-field"><strong>No filament is currently listed as available.</strong><p>Staff must mark a filament Available in Materials before you can request it.</p></div>`}\
 </div>\
 <div class="inventory-banner">\
   <span>\
@@ -384,7 +383,7 @@ function reviewCard(w) {
 }
 
 export async function getStartedPage(state) {
-  const availableFilaments = await inventoryService.listAvailable();
+    const availableFilaments = await inventoryService.listAvailable();
   const selected = availableFilaments.find((item) => item.id === state.wizard.inventoryId)
     || availableFilaments.find((item) => item.material === state.wizard.material && item.color === state.wizard.color)
     || availableFilaments[0];

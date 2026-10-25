@@ -1,12 +1,12 @@
-import { contributionsService, hoursService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=19";
-import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=19";
-import { notificationsService } from "./notificationsService.js?v=19";
-import { dateTime, esc, printNumber } from "./pageShared.js?v=19";
-import { accessDeniedPage, homePage } from "./publicPages.js?v=19";
-import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=19";
-import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=19";
-import { getStartedPage } from "./requestWizard.js?v=19";
-import { myJobsPage } from "./studentPages.js?v=19";
+import { contributionsService, hoursService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=20";
+import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=20";
+import { notificationsService } from "./notificationsService.js?v=20";
+import { dateTime, esc, printNumber } from "./pageShared.js?v=20";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=20";
+import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=20";
+import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=20";
+import { getStartedPage } from "./requestWizard.js?v=20";
+import { myJobsPage } from "./studentPages.js?v=20";
 import {
   activeJobsPage,
   jobDetailsPage,
@@ -14,8 +14,8 @@ import {
   staffMaterialForm,
   staffMaterials,
   staffOverview,
-} from "./staffPages.js?v=19";
-import { staffHours } from "./hoursPages.js?v=19";
+} from "./staffPages.js?v=20";
+import { staffHours } from "./hoursPages.js?v=20";
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
@@ -153,7 +153,7 @@ async function render() {
     ? PERMISSIONS.HOURS_ADMIN
     : ROUTE_PERMISSIONS[route.page];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    document.title = "Access restricted · 3D Print Farm · v1.5 Beta";
+    document.title = "Access restricted · 3D Print Farm · v1.6 Beta";
     app.innerHTML = accessDeniedPage(state, requiredPermission);
     window.scrollTo({ top: 0, behavior: "auto" });
     return;
@@ -161,13 +161,13 @@ async function render() {
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v1.5-beta · Version 1.5 Beta";
+    document.title = "Staff Portal · School 3D Print Farm — v1.6-beta · Version 1.6 Beta";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v1.5-beta · Version 1.5 Beta";
+    document.title = "Get Started · School 3D Print Farm — v1.6-beta · Version 1.6 Beta";
   } else if (route.page === "my-jobs") {
-    document.title = "My Jobs · School 3D Print Farm — v1.5-beta · Version 1.5 Beta";
+    document.title = "My Jobs · School 3D Print Farm — v1.6-beta · Version 1.6 Beta";
   } else {
-    document.title = "School 3D Print Farm Website — v1.5-beta · Version 1.5 Beta";
+    document.title = "School 3D Print Farm Website — v1.6-beta · Version 1.6 Beta";
   }
 
   if (route.page === "home") {
@@ -196,7 +196,7 @@ async function render() {
     const selectedFile = state.wizard.modelFile;
     const stage = document.querySelector("#model-preview");
     try {
-      modelPreviewModule ||= await import("./modelPreview.js?v=19");
+      modelPreviewModule ||= await import("./modelPreview.js?v=20");
       if (revision !== renderRevision || selectedFile !== state.wizard.modelFile || !stage?.isConnected) return;
       await modelPreviewModule.mountModelPreview(stage, selectedFile, (status, message = "") => {
         if (revision !== renderRevision || selectedFile !== state.wizard.modelFile) return;
@@ -563,6 +563,16 @@ async function doAction(action, target) {
       const item = await inventoryService.toggleAvailability(id);
       toast(`${item.material} · ${item.color} is now ${item.available ? "available" : "unavailable"}.`);
       await render();
+    } else if (action === "inventory-low-stock-toggle") {
+      const item = await inventoryService.toggleLowStock(id);
+      toast(`Low Stock is ${item.lowStock ? "on" : "off"} for ${item.material} · ${item.color}.`);
+      await render();
+    } else if (action === "inventory-delete") {
+      const label = target.dataset.label || "this filament";
+      if (!window.confirm(`Delete ${label}? This permanently removes it from Materials and new print requests.`)) return;
+      await inventoryService.remove(id);
+      toast("Filament deleted and removed from new requests.");
+      await render();
     } else if (action === "claim-job") {
       await jobsService.claimJob(id);
       toast("Job claimed and assigned to " + authService.getCurrentIdentity().name + ".");
@@ -618,8 +628,8 @@ async function doAction(action, target) {
 
       if (state.wizard.step === 2) {
         const selection = await inventoryService.getItem(state.wizard.inventoryId);
-        if (!selection || !selection.available || Number(selection.quantity) <= 0) {
-          toast("That filament is no longer available. Choose a current option or ask staff about restocking.", "error");
+        if (!selection || !selection.available || !selection.hexColor) {
+          toast("That filament is no longer available. Choose a current option or ask staff to verify its color.", "error");
           state.wizard.inventoryId = "";
           await render();
           return;
@@ -772,18 +782,10 @@ app.addEventListener("submit", async (event) => {
       await render();
       toast("Job reassigned to " + job.assignedStaff + ".");
     } else if (action === "inventory-add") {
-      await inventoryService.add({ ...values, available: values.available === "true" });
+      await inventoryService.add(values);
       location.hash = "#/staff/materials";
       await render();
-      toast("Filament inventory entry added.");
-    } else if (action === "inventory-update") {
-      await inventoryService.update(form.dataset.id, { ...values, available: values.available === "true" });
-      await render();
-      toast("Inventory entry updated.");
-    } else if (action === "inventory-adjust") {
-      await inventoryService.adjust(form.dataset.id, values);
-      await render();
-      toast(values.action === "receive" ? "Received stock recorded." : "Material consumption recorded.");
+      toast("Filament added and available for new requests.");
     } else if (action === "hours-add") {
       await contributionsService.add(values);
       await render();
@@ -871,7 +873,11 @@ app.addEventListener("input", (event) => {
   if (target.matches("[data-hex-input]")) {
     const preview = target.form?.querySelector("[data-rgb-preview]");
     const rgb = rgbFromHex(target.value);
-    if (preview) preview.textContent = rgb || "Enter a valid HEX value such as #2F80ED.";
+    const rgbText = preview?.querySelector("[data-color-rgb]");
+    const swatch = preview?.querySelector("[data-color-swatch]");
+    const hexMatch = /^#?([\da-f]{6})$/i.exec(target.value.trim());
+    if (rgbText) rgbText.textContent = rgb || "Enter a valid HEX value such as #2F80ED.";
+    if (swatch) swatch.style.setProperty("--filament-color", hexMatch ? `#${hexMatch[1].toUpperCase()}` : "transparent");
     target.setCustomValidity(target.value && !rgb ? "Use a six-digit HEX value in the format #RRGGBB." : "");
   }
 
@@ -893,13 +899,13 @@ app.addEventListener("change", async (event) => {
 
   if (target.matches("[data-hours-preview-input]")) updateHoursPreview(target.form);
 
-  if (target.matches("#model-file")) {
-    void setFile(target.files?.[0]);
+  if (target.matches("[data-hex-input]")) {
+    const hexMatch = /^#?([\da-f]{6})$/i.exec(target.value.trim());
+    if (hexMatch) target.value = `#${hexMatch[1].toUpperCase()}`;
   }
 
-  if (target.matches("[data-inventory-unit]")) {
-    const threshold = target.closest("form")?.querySelector('[name="lowStockThreshold"]');
-    if (threshold) threshold.value = ({ g: "100", kg: "0.1", spools: "1" })[target.value] || "0";
+  if (target.matches("#model-file")) {
+    void setFile(target.files?.[0]);
   }
 
   if (target.matches("[data-field]")) {

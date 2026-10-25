@@ -3,15 +3,70 @@ import {
   MOCK_JOBS,
   MOCK_NOTIFICATIONS,
   STATUSES,
-} from "./data.js?v=19";
-import { authService } from "./authService.js?v=19";
-import { getRole, PERMISSIONS } from "./authorization.js?v=19";
-import { API_BASE_URL } from "./apiClient.js?v=19";
-import { filesService } from "./filesService.js?v=19";
+} from "./data.js?v=20";
+import { authService } from "./authService.js?v=20";
+import { getRole, PERMISSIONS } from "./authorization.js?v=20";
+import { API_BASE_URL } from "./apiClient.js?v=20";
+import { filesService } from "./filesService.js?v=20";
 
 const STORE_KEY = "three-d-print-farm-demo-v3";
 const DRAFT_KEY = "three-d-print-farm-draft-v2";
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const LEGACY_CSS_COLORS = {
+  black: "#000000", blue: "#0000FF", gray: "#808080", grey: "#808080",
+  green: "#008000", orange: "#FFA500", pink: "#FFC0CB", purple: "#800080",
+  red: "#FF0000", white: "#FFFFFF", yellow: "#FFFF00", brown: "#A52A2A",
+};
+
+function normalizeHex(value) {
+  const match = /^#?([\da-f]{6})$/i.exec(String(value || "").trim());
+  return match ? `#${match[1].toUpperCase()}` : null;
+}
+
+export function rgbFromHex(value) {
+  const hex = normalizeHex(value);
+  if (!hex) return "";
+  const red = Number.parseInt(hex.slice(1, 3), 16);
+  const green = Number.parseInt(hex.slice(3, 5), 16);
+  const blue = Number.parseInt(hex.slice(5, 7), 16);
+  return `RGB(${red}, ${green}, ${blue})`;
+}
+
+function normalizeInventoryItem(item) {
+  const color = typeof item.color === "string" ? item.color.trim() : "";
+  const quantity = Number(item.quantity);
+  const threshold = Number(item.lowStockThreshold);
+  const isLegacyStatus = typeof item.lowStock !== "boolean";
+  const lowStock = typeof item.lowStock === "boolean"
+    ? item.lowStock
+    : Number.isFinite(quantity) && quantity > 0 && Number.isFinite(threshold) && quantity <= threshold;
+  return {
+    id: item.id,
+    material: typeof item.material === "string" ? item.material.trim() : "",
+    color,
+    hexColor: normalizeHex(item.hexColor) || LEGACY_CSS_COLORS[color.toLowerCase()] || "",
+    lowStock,
+    available: item.available === true && !(isLegacyStatus && Number.isFinite(quantity) && quantity <= 0),
+    ...(typeof item.createdAt === "string" ? { createdAt: item.createdAt } : {}),
+    ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+  };
+}
+
+function inventoryNeedsMigration(original, normalized) {
+  if (!Array.isArray(original) || original.length !== normalized.length) return true;
+  const supportedKeys = new Set(["id", "material", "color", "hexColor", "lowStock", "available", "createdAt", "updatedAt"]);
+  return original.some((item, index) => {
+    const current = normalized[index];
+    return !item
+      || Object.keys(item).some((key) => !supportedKeys.has(key))
+      || item.id !== current.id
+      || item.material !== current.material
+      || item.color !== current.color
+      || item.hexColor !== current.hexColor
+      || item.lowStock !== current.lowStock
+      || item.available !== current.available;
+  });
+}
 
 function seedState() {
   return {
@@ -75,10 +130,9 @@ function isValidState(value) {
       && typeof item.id === "string"
       && typeof item.material === "string"
       && typeof item.color === "string"
-      && Number.isFinite(Number(item.quantity))
-      && Number(item.quantity) >= 0
-      && ["g", "kg", "spools"].includes(item.unit)
-      && typeof item.available === "boolean"
+      && (item.hexColor === undefined || typeof item.hexColor === "string")
+      && (item.lowStock === undefined || typeof item.lowStock === "boolean")
+      && (item.available === undefined || typeof item.available === "boolean")
     ))
   );
   const contributionsAreValid = value.contributions === undefined || (
@@ -153,7 +207,7 @@ function isValidState(value) {
 function normalizeState(value) {
   return {
     ...value,
-    inventory: Array.isArray(value.inventory) ? value.inventory : [],
+    inventory: Array.isArray(value.inventory) ? value.inventory.map(normalizeInventoryItem) : [],
     contributions: Array.isArray(value.contributions) ? value.contributions : [],
     hours: isRecord(value.hours) ? value.hours : { transactions: [], requests: [] },
   };
@@ -218,7 +272,8 @@ function readState() {
       if (isValidState(parsed)) {
         const normalized = normalizeState(parsed);
         const migratedContributions = migrateLegacyStaffContributions(normalized);
-        if (parsed.inventory === undefined || parsed.contributions === undefined || parsed.hours === undefined || migratedContributions) writeState(normalized);
+        const migratedInventory = inventoryNeedsMigration(parsed.inventory, normalized.inventory);
+        if (parsed.inventory === undefined || parsed.contributions === undefined || parsed.hours === undefined || migratedContributions || migratedInventory) writeState(normalized);
         return normalized;
       }
       console.warn("Demo data has an invalid format; restoring the seed data.");
@@ -281,11 +336,14 @@ function validatePayload(payload) {
   filesService.validateMetadata(payload.file);
   assert(MATERIALS.some(({ id }) => id === payload.material), "Choose a supported print material.");
   assert(typeof payload.color === "string" && payload.color.trim(), "Choose an available color.");
-  const option = state.inventory.find((item) => (
+  const matchesSelection = (item) => (
     item.material === payload.material
     && item.color.toLowerCase() === payload.color.trim().toLowerCase()
-  ));
-  assert(option && option.available && Number(option.quantity) > 0 && withColorData(option).hexColor, "That material and color are no longer available or its color code needs verification. Refresh the options and choose an available filament.");
+  );
+  const option = payload.inventoryId
+    ? state.inventory.find((item) => item.id === payload.inventoryId && matchesSelection(item))
+    : state.inventory.find(matchesSelection);
+  assert(option && option.available && withColorData(option).hexColor, "That filament is no longer available or its color code needs verification. Refresh the options and choose an available filament.");
 }
 
 export const jobsService = {
@@ -586,22 +644,7 @@ export const jobsService = {
 };
 
 const MATERIAL_IDS = new Set(MATERIALS.map(({ id }) => id));
-const INVENTORY_UNITS = new Set(["g", "kg", "spools"]);
 const localId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`}`;
-const LEGACY_CSS_COLORS = {
-  black: "#000000", blue: "#0000FF", gray: "#808080", grey: "#808080",
-  green: "#008000", orange: "#FFA500", pink: "#FFC0CB", purple: "#800080",
-  red: "#FF0000", white: "#FFFFFF", yellow: "#FFFF00", brown: "#A52A2A",
-};
-const normalizeHex = (value) => /^#[\da-f]{6}$/i.test(String(value || "").trim()) ? String(value).trim().toUpperCase() : null;
-export function rgbFromHex(value) {
-  const hex = normalizeHex(value);
-  if (!hex) return "";
-  const red = Number.parseInt(hex.slice(1, 3), 16);
-  const green = Number.parseInt(hex.slice(3, 5), 16);
-  const blue = Number.parseInt(hex.slice(5, 7), 16);
-  return `rgb(${red}, ${green}, ${blue})`;
-}
 function withColorData(item) {
   const hexColor = normalizeHex(item.hexColor) || LEGACY_CSS_COLORS[item.color.trim().toLowerCase()] || null;
   return { ...item, hexColor, rgbColor: rgbFromHex(hexColor) };
@@ -612,17 +655,7 @@ function validateInventory(payload) {
   assert(typeof payload.color === "string" && payload.color.trim().length > 0 && payload.color.trim().length <= 60, "Enter a color name of up to 60 characters.");
   assert(payload.color.trim().toLowerCase() !== "[object object]", "Enter a valid color name.");
   assert(normalizeHex(payload.hexColor), "Enter a valid six-digit HEX color such as #2F80ED.");
-  assert(Number.isFinite(Number(payload.quantity)) && Number(payload.quantity) >= 0, "Stock quantity must be zero or greater.");
-  assert(INVENTORY_UNITS.has(payload.unit), "Choose grams, kilograms, or spools as the unit.");
-  assert(Number.isFinite(Number(payload.lowStockThreshold)) && Number(payload.lowStockThreshold) >= 0, "Low-stock threshold must be zero or greater.");
-  assert(typeof payload.notes === "string" && payload.notes.length <= 300, "Notes must be 300 characters or fewer.");
-}
-
-function inventoryStatus(item) {
-  if (!item.available) return "Unavailable";
-  if (Number(item.quantity) <= 0) return "Out of stock";
-  if (Number(item.quantity) <= Number(item.lowStockThreshold || 0)) return "Low stock";
-  return "Available";
+  assert(typeof payload.lowStock === "boolean" && typeof payload.available === "boolean", "Filament status must use valid on or off values.");
 }
 
 export const inventoryService = {
@@ -635,7 +668,7 @@ export const inventoryService = {
   },
   async listAvailable() {
     state = readState();
-    return clone(state.inventory.filter((item) => item.available && Number(item.quantity) > 0).map(withColorData).filter((item) => Boolean(item.hexColor)));
+    return clone(state.inventory.filter((item) => item.available).map(withColorData).filter((item) => Boolean(item.hexColor)));
   },
   async getItem(id) {
     state = readState();
@@ -645,59 +678,23 @@ export const inventoryService = {
   async add(payload) {
     return update(() => {
       const normalized = {
-        ...payload,
         material: String(payload.material || ""),
         color: String(payload.color || "").trim(),
         hexColor: normalizeHex(payload.hexColor),
-        quantity: Number(payload.quantity),
-        lowStockThreshold: Number(payload.lowStockThreshold),
-        notes: String(payload.notes || "").trim(),
-        available: Boolean(payload.available),
+        lowStock: false,
+        available: true,
       };
       validateInventory(normalized);
       const duplicate = state.inventory.some((item) => item.material === normalized.material && item.color.toLowerCase() === normalized.color.toLowerCase());
-      assert(!duplicate, "That material and color already have an inventory entry. Edit the existing row instead.");
+      assert(!duplicate, "A filament with this material and color already exists.");
       const timestamp = nowIso();
       const item = {
         id: localId("FIL"),
         ...normalized,
-        adjustments: [{ type: "initial", delta: normalized.quantity, note: "Initial stock", at: timestamp, by: currentStaff().name }],
         createdAt: timestamp,
         updatedAt: timestamp,
       };
       state.inventory.unshift(item);
-      return item;
-    });
-  },
-  async update(id, payload) {
-    return update(() => {
-      const item = state.inventory.find((entry) => entry.id === id);
-      assert(item, "Inventory entry not found. Refresh the page and try again.");
-      const normalized = {
-        ...payload,
-        material: String(payload.material || ""),
-        color: String(payload.color || "").trim(),
-        hexColor: normalizeHex(payload.hexColor),
-        quantity: Number(payload.quantity),
-        lowStockThreshold: Number(payload.lowStockThreshold),
-        notes: String(payload.notes || "").trim(),
-        available: Boolean(payload.available),
-      };
-      validateInventory(normalized);
-      const duplicate = state.inventory.some((entry) => entry.id !== id && entry.material === normalized.material && entry.color.toLowerCase() === normalized.color.toLowerCase());
-      assert(!duplicate, "Another entry already uses that material and color.");
-      const previousQuantity = Number(item.quantity);
-      Object.assign(item, normalized, { updatedAt: nowIso() });
-      if (previousQuantity !== normalized.quantity) {
-        item.adjustments ||= [];
-        item.adjustments.unshift({
-          type: "set",
-          delta: normalized.quantity - previousQuantity,
-          note: "Quantity changed in inventory form",
-          at: item.updatedAt,
-          by: currentStaff().name,
-        });
-      }
       return item;
     });
   },
@@ -710,29 +707,22 @@ export const inventoryService = {
       return item;
     });
   },
-  async adjust(id, payload) {
+  async toggleLowStock(id) {
     return update(() => {
       const item = state.inventory.find((entry) => entry.id === id);
       assert(item, "Inventory entry not found. Refresh the page and try again.");
-      const amount = Number(payload.amount);
-      assert(Number.isFinite(amount) && amount > 0, "Enter an adjustment greater than zero.");
-      assert(["receive", "consume"].includes(payload.action), "Choose whether stock was received or consumed.");
-      const delta = payload.action === "receive" ? amount : -amount;
-      assert(Number(item.quantity) + delta >= 0, "This adjustment cannot reduce stock below zero.");
-      item.quantity = Number(item.quantity) + delta;
+      item.lowStock = !item.lowStock;
       item.updatedAt = nowIso();
-      item.adjustments ||= [];
-      item.adjustments.unshift({
-        type: payload.action,
-        delta,
-        note: String(payload.note || "").trim().slice(0, 120),
-        at: item.updatedAt,
-        by: currentStaff().name,
-      });
       return item;
     });
   },
-  status: inventoryStatus,
+  async remove(id) {
+    return update(() => {
+      const index = state.inventory.findIndex((entry) => entry.id === id);
+      assert(index >= 0, "Filament entry not found. Refresh the page and try again.");
+      return state.inventory.splice(index, 1)[0];
+    });
+  },
 };
 
 function validateContribution(payload) {

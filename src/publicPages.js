@@ -1,19 +1,22 @@
-import { MATERIALS } from "./data.js?v=19";
-import { esc, footer, publicHeader } from "./pageShared.js?v=19";
-import { PERMISSION_LABELS } from "./authorization.js?v=19";
-import { authService } from "./authService.js?v=19";
-import { partArtwork } from "./visualComponents.js?v=19";
+import { MATERIALS } from "./data.js?v=20";
+import { esc, footer, publicHeader } from "./pageShared.js?v=20";
+import { PERMISSION_LABELS } from "./authorization.js?v=20";
+import { authService } from "./authService.js?v=20";
+import { partArtwork } from "./visualComponents.js?v=20";
 
 const safeSwatch = (hexColor) => (/^#[\da-f]{6}$/i.test(hexColor || "") ? hexColor : "#2b2b2b");
 
 export function homePage(scrollTo = "", state, inventory = []) {
   const stockRows = inventory.length
     ? inventory.map((item) => {
-      const status = !item.hexColor ? "Color code needed" : !item.available ? "Unavailable" : Number(item.quantity) <= 0 ? "Out of stock" : Number(item.quantity) <= Number(item.lowStockThreshold || 0) ? "Low stock" : "Available";
-      const isSelectable = Boolean(item.hexColor) && item.available && Number(item.quantity) > 0;
+      const status = !item.hexColor
+        ? "Color code needs verification"
+        : item.available
+          ? `Available${item.lowStock ? " · Low stock" : ""}`
+          : "Unavailable";
       return `<li class="faq-stock-item">
   <span class="filament-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${safeSwatch(item.hexColor)}" aria-hidden="true"></span>
-  <span><strong>${esc(item.material)} · ${esc(item.color)}</strong><small>${esc(status)} · ${Number(item.quantity)} ${esc(item.unit)}${isSelectable ? " in inventory" : ""}</small></span>
+  <span><strong>${esc(item.material)} · ${esc(item.color)}</strong><small>${esc(status)}</small></span>
 </li>`;
     }).join("")
     : `<li class="faq-stock-empty">No filament colors have been entered in this demo inventory yet. Ask the school team what they can provide.</li>`;

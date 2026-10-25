@@ -1,17 +1,19 @@
-# 3D Print Farm Website — v1.5 Beta
+# 3D Print Farm Website — v1.6 Beta
 
-**Version 1.5 Beta** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, and staff hours management.
+**Version 1.6 Beta** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, and filament availability.
 
-![version](https://img.shields.io/badge/version-v1.5--beta-blue)
+![version](https://img.shields.io/badge/version-v1.6--beta-blue)
 ![release](https://img.shields.io/badge/status-beta-orange)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JavaScript-f7df1e?logo=javascript&logoColor=black)
 ![storage](https://img.shields.io/badge/storage-browser%20localStorage-lightgrey)
 
-> **Beta prototype:** The identities and access controls are for demonstration only. Do not use this application with real student information, production requests, secured staff work, or authoritative hour or stock records.
+> **Beta prototype:** The identities and access controls are for demonstration only. Do not use this application with real student information, production requests, secured staff work, or authoritative hour or inventory records.
 
 ## Release summary
 
-v1.5 Beta adds staff hours management to the Staff Dashboard. Level 2 and Level 3 staff use **Hours** to view their own balance and history and submit adjustment requests. Level 4 staff use one combined **Hours** page to manage Level 2 and Level 3 balances, review requests, and view hours and student contribution activity together. Level 4 staff do not have a personal hours balance.
+v1.6 Beta redesigns **Materials** as a filament availability list. Level 3 and Level 4 staff can set **Low Stock** and **Available** independently, add a filament with its verified HEX color, and delete an entry after confirmation. The app derives the RGB value from HEX. Levels 1–4 see the selected filament's swatch, material, color name, HEX, RGB, and status during request submission; low-stock filaments remain selectable when Available is on.
+
+The Staff Dashboard also includes the v1.5 hours management: Level 2 and Level 3 staff use **Hours** to view their own balance and history and submit adjustment requests. Level 4 staff use one combined **Hours** page to manage Level 2 and Level 3 balances, review requests, and view hours and student contribution activity together. Level 4 staff do not have a personal hours balance.
 
 Also enjoy the new Overview page :)
 
@@ -84,11 +86,11 @@ Legacy links to `#/staff/queue` redirect to the Staff Overview. The former stude
 
 The public homepage includes project information, use cases, and FAQs. Get Started collects a model file, print settings, and project details across a four-step request workflow. It accepts STL, 3MF, and OBJ files up to **25 MB** and previews models in the browser. A direct HTTPS model URL can be loaded when its host permits cross-origin access. Model bytes are used for preview and validation only; no model is uploaded.
 
-The Staff Portal retains job review, active job assignment, job status updates, simulated pickup notifications, and filament management. The Overview's Recent Jobs table shows each print name in white above a muted, shortened `PFN-****` print number; file and material columns are omitted. The same shortened number appears throughout job pages and when copied. Student contribution records are available to Level 4 in the combined Hours activity history. These actions update local demo data only. Filament values use a verified HEX code as the source of truth and derive RGB for display. New browser installations start with an empty filament inventory because the repository contains no verified stock records.
+The Staff Portal retains job review, active job assignment, job status updates, simulated pickup notifications, and filament availability management. The Materials list shows the actual color swatch, plastic type, color name, normalized HEX, and derived RGB. Level 3 and Level 4 staff can independently toggle Low Stock and Available; unavailable entries remain visible to staff, and confirmed deletion removes an entry from request choices. New entries start with Low Stock off and Available on. In the request workflow, available low-stock filaments remain selectable and display a warning; unavailable or deleted entries are not offered. The Overview's Recent Jobs table shows each print name in white above a muted, shortened `PFN-****` print number; file and material columns are omitted. The same shortened number appears throughout job pages and when copied. Student contribution records are available to Level 4 in the combined Hours activity history. These actions update local demo data only.
 
 ## Data, setup, and limitations
 
-Jobs, notifications, inventory, contribution records, hour requests, and hour transactions use the browser localStorage key `three-d-print-farm-demo-v3`. Additional demo profiles use `three-d-print-farm-demo-accounts`; the active identity uses `three-d-print-farm-demo-role`. These records are local to this browser and origin, are not shared between users or devices, and are removed if browser data is cleared. Where supported, the app uses the browser Web Locks API to serialize same-origin writes; localStorage still cannot guarantee database-grade transactions or consistency across devices.
+Jobs, notifications, filament entries, contribution records, hour requests, and hour transactions use the browser localStorage key `three-d-print-farm-demo-v3`. A filament entry stores its identity, HEX color, Low Stock Boolean, and Available Boolean; RGB is derived from HEX. Existing v1.5 inventory records are migrated in place: the former threshold rule becomes the Low Stock flag, and entries with zero quantity become unavailable so they are not newly offered. Quantity, threshold, adjustment, and note fields are then removed. Additional demo profiles use `three-d-print-farm-demo-accounts`; the active identity uses `three-d-print-farm-demo-role`. These records are local to this browser and origin, are not shared between users or devices, and are removed if browser data is cleared. Where supported, the app uses the browser Web Locks API to serialize same-origin writes; localStorage still cannot guarantee database-grade transactions or consistency across devices.
 
 The repository has no backend, database, Google authentication, email delivery, printer control, or server-side authorization. A production system must authenticate users on a server, enforce permissions for every protected operation, and store hours and audit history in a shared transactional database. A frontend role selector and client-side checks do not prove a user's identity or securely protect data.
 

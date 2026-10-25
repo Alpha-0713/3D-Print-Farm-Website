@@ -1,4 +1,4 @@
-import { jobsService } from "./services.js?v=19";
+import { jobsService } from "./services.js?v=20";
 
 export const notificationsService = {
   mode: "mock",

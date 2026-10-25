@@ -1,6 +1,6 @@
-import { jobsService } from "./services.js?v=19";
-import { authService } from "./authService.js?v=19";
-import { esc, footer, printNumber, publicHeader, shortDate, statusBadge } from "./pageShared.js?v=19";
+import { jobsService } from "./services.js?v=20";
+import { authService } from "./authService.js?v=20";
+import { esc, footer, printNumber, publicHeader, shortDate, statusBadge } from "./pageShared.js?v=20";
 
 function jobCard(job, showAction = true) {
   return `<article class="job-card">\

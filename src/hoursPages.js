@@ -1,8 +1,8 @@
-import { hoursService } from "./services.js?v=19";
-import { authService } from "./authService.js?v=19";
-import { PERMISSIONS } from "./authorization.js?v=19";
-import { dateTime, esc } from "./pageShared.js?v=19";
-import { staffShell } from "./staffPages.js?v=19";
+import { hoursService } from "./services.js?v=20";
+import { authService } from "./authService.js?v=20";
+import { PERMISSIONS } from "./authorization.js?v=20";
+import { dateTime, esc } from "./pageShared.js?v=20";
+import { staffShell } from "./staffPages.js?v=20";
 
 const formatHours = (centi) => `${(Number(centi || 0) / 100).toFixed(2).replace(/\.00$/, "")} h`;
 const signedHours = (centi) => `${centi > 0 ? "+" : "−"}${formatHours(Math.abs(centi))}`;
