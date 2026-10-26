@@ -48,13 +48,12 @@ export function appearanceControls() {
   return '<div class="appearance-controls" aria-label="Accent color settings">' +
     '<details class="accent-picker"><summary aria-label="Choose accent color. Current color: ' + current +
     '" title="Choose accent color"><span class="accent-current" aria-hidden="true"></span>' +
-    '<span class="accent-picker-label">' + current + '</span><span class="accent-caret" aria-hidden="true">⌄</span></summary>' +
-    '<div class="accent-options" role="group" aria-label="Accent colors">' + options + '</div></details></div>';
+    '<span class="accent-picker-label">' + current + '</span></summary>' +
+    '<div class="accent-options" role="group" aria-label="Accent colors"><span class="accent-options-heading">ACCENT COLOR</span>' + options + '</div></details></div>';
 }
 
 export function roleSwitcher() {
   const identity = authService.getCurrentIdentity();
-  const role = ROLES[identity.roleId];
   const choices = authService.getDemoIdentities().map((choice) => {
     const choiceRole = ROLES[choice.roleId];
     const active = choice.id === identity.id;
@@ -70,9 +69,8 @@ export function roleSwitcher() {
     .join("");
 
   return '<details class="role-switcher">' +
-    '<summary aria-label="Active demo identity: ' + esc(identity.name) + ', ' + esc(role.title) + ', Level ' + role.level + '">' +
-      '<span class="role-switcher-copy"><strong>' + esc(identity.name) + '</strong><small>' + esc(role.title) + ' · Level ' + role.level + '</small></span>' +
-      '<span class="role-switcher-caret" aria-hidden="true">⌄</span>' +
+    '<summary aria-label="Active demo identity: ' + esc(identity.name) + '">' +
+      '<span class="role-switcher-copy"><strong>' + esc(identity.name) + '</strong></span>' +
     '</summary>' +
     '<div class="role-switcher-menu"><span class="role-switcher-heading">DEMO IDENTITY</span>' +
       choices +
@@ -102,7 +100,7 @@ export function publicHeader(state) {
         ${canOpenStaff ? '<a href="#/staff">Staff Portal</a>' : ""}\
       </div>\
     </nav>\
-    <button class="menu-toggle" type="button" aria-expanded="${state.menuOpen}" aria-controls="public-nav" data-action="menu-toggle" aria-label="${state.menuOpen ? "Close" : "Open"} navigation">${state.menuOpen ? "×" : "☰"}</button>\
+    <button class="menu-toggle" type="button" aria-expanded="${state.menuOpen}" aria-controls="public-nav" data-action="menu-toggle" aria-label="${state.menuOpen ? "Close" : "Open"} navigation"><span class="menu-toggle-icon" aria-hidden="true"><i class="menu-toggle-line menu-toggle-line-top"></i><i class="menu-toggle-line menu-toggle-line-middle"></i><i class="menu-toggle-line menu-toggle-line-bottom"></i></span></button>\
     <div class="header-actions">\
       <a class="nav-quiet" href="#/my-jobs">My Jobs</a>\
       ${canOpenStaff ? '<a class="nav-quiet staff-link" href="#/staff">Staff Portal</a>' : ""}\
@@ -136,7 +134,7 @@ export function footer() {
   <div class="footer-bottom">\
     <span>© ${new Date().getFullYear()} 3D Print Farm</span>\
     <span>Files stay in your browser · no emails are sent</span>
-    <span>v1.6-beta · Version 1.6 Beta</span>\
+    <span>v2.0.0 · Animation & visual redesign</span>\
   </div>\
 </footer>`;
 }

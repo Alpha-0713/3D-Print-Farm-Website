@@ -1,5 +1,5 @@
 import { MATERIALS } from "./data.js?v=20";
-import { esc, footer, publicHeader } from "./pageShared.js?v=20";
+import { esc, footer, publicHeader } from "./pageShared.js?v=25";
 import { PERMISSION_LABELS } from "./authorization.js?v=20";
 import { authService } from "./authService.js?v=20";
 import { partArtwork } from "./visualComponents.js?v=20";

@@ -1,5 +1,5 @@
 import { inventoryService } from "./services.js?v=20";
-import { esc, footer, printNumber, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=20";
+import { esc, footer, printNumber, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=25";
 
 function stepIndicator(active) {
   const steps = [[1, "Upload model"], [2, "Print settings"], [3, "Project details"], [4, "Review & submit"]];

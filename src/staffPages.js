@@ -1,7 +1,7 @@
 import { MATERIALS } from "./data.js?v=20";
 import { contributionsService, inventoryService, jobsService } from "./services.js?v=20";
 import { notificationsService } from "./notificationsService.js?v=20";
-import { appearanceControls, dateTime, esc, logo, printNumber, roleSwitcher, shortDate, statusBadge } from "./pageShared.js?v=20";
+import { appearanceControls, dateTime, esc, logo, printNumber, roleSwitcher, shortDate, statusBadge } from "./pageShared.js?v=25";
 import { authService } from "./authService.js?v=20";
 import { PERMISSIONS, ROLES } from "./authorization.js?v=20";
 

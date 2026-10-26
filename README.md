@@ -1,8 +1,8 @@
-# 3D Print Farm Website — v1.7 Beta
+# 3D Print Farm Website — v2.0.0
 
-**Version 1.7 Beta** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, filament availability, and print farm equipment.
+**Version 2.0.0** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, filament availability, and print farm equipment.
 
-![version](https://img.shields.io/badge/version-v1.7--beta-blue)
+![version](https://img.shields.io/badge/version-v2.0.0-blue)
 ![release](https://img.shields.io/badge/status-beta-orange)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JavaScript-f7df1e?logo=javascript&logoColor=black)
 ![storage](https://img.shields.io/badge/storage-browser%20localStorage-lightgrey)
@@ -10,6 +10,10 @@
 > **Beta prototype:** The identities and access controls are for demonstration only. Do not use this application with real student information, production requests, secured staff work, or authoritative hour or inventory records.
 
 ## Release summary
+
+v2.0.0 establishes a shared motion and visual system across the public pages, request flow, student job views, and staff portal. Page changes use short, non-blocking entrances; major sections reveal once as they enter view; cards, controls, menus, accordions, and dialogs respond with restrained state feedback. The system uses transform and opacity, respects reduced-motion settings, and leaves content visible when animation support is unavailable.
+
+Liquid Glass styling is reserved for navigation and transient controls, where translucent layers can reveal the page beneath while maintaining contrast. Content cards keep opaque, stable surfaces. The glass treatment adapts to reduced-transparency and higher-contrast preferences, and identity/accent menus layer above page content. The public header’s accent, Get Started, and identity controls share a 40px height on wider layouts while keeping content-driven widths. Rectangular controls and surfaces share an 18px corner radius; the FAQ and final call-to-action sections keep square outer corners, and FAQ plus/X marks are centered. Circular indicators and swatches retain their round shape. Staff pages use a shared spacing rhythm. Popovers and their options ease into place with staggered motion, while menu-button feedback glides in and its three strokes morph cleanly between menu and close states.
 
 v1.7 Beta adds an **Our Printers** section to the public homepage, immediately above the FAQ. It describes the Bambu Lab A1 mini and Bambu Lab H2S, including their build volumes, FDM technology, example projects, and material and size guidance. The farm's A1 mini jobs are single-colour only; the H2S is the only farm model available for multi-colour jobs. Printer assignment and printability remain subject to job review and available materials.
 
@@ -31,7 +35,7 @@ Open http://localhost:8000 and stop the server with Control-C. An internet conne
 
 ## Demonstration identities and permissions
 
-Open **Demo identity** in the header to choose among six built-in demo identities. The active name, role title, and access level appear in the selector. Use **Create New Account** at the bottom of the menu to add another local demo profile and choose its access level. New profiles are saved in this browser under `three-d-print-farm-demo-accounts`; the selected identity is stored under `three-d-print-farm-demo-role`. If storage is unavailable, newly created profiles last for the current page session.
+Open **Demo identity** in the header to choose among six built-in demo identities. The selected name appears in the control; role titles and access levels remain listed in the chooser. Use **Create New Account** at the bottom of the menu to add another local demo profile and choose its access level. New profiles are saved in this browser under `three-d-print-farm-demo-accounts`; the selected identity is stored under `three-d-print-farm-demo-role`. If storage is unavailable, newly created profiles last for the current page session.
 
 | Level | Role and identity | Access |
 | --- | --- | --- |

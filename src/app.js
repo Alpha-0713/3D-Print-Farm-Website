@@ -1,12 +1,12 @@
 import { contributionsService, hoursService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=20";
 import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=20";
 import { notificationsService } from "./notificationsService.js?v=20";
-import { dateTime, esc, printNumber } from "./pageShared.js?v=20";
-import { accessDeniedPage, homePage } from "./publicPages.js?v=21";
+import { dateTime, esc, printNumber } from "./pageShared.js?v=25";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=24";
 import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=20";
 import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=20";
-import { getStartedPage } from "./requestWizard.js?v=20";
-import { myJobsPage } from "./studentPages.js?v=20";
+import { getStartedPage } from "./requestWizard.js?v=25";
+import { myJobsPage } from "./studentPages.js?v=24";
 import {
   activeJobsPage,
   jobDetailsPage,
@@ -14,8 +14,8 @@ import {
   staffMaterialForm,
   staffMaterials,
   staffOverview,
-} from "./staffPages.js?v=20";
-import { staffHours } from "./hoursPages.js?v=20";
+} from "./staffPages.js?v=24";
+import { staffHours } from "./hoursPages.js?v=24";
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
@@ -91,6 +91,85 @@ function decodeRouteId(value) {
 let modelPreviewModule;
 let renderRevision = 0;
 let linkController = null;
+let lastRenderedRouteKey = "";
+let routeMotionObserver = null;
+let routeMotionCleanup = null;
+
+function clearRouteMotion() {
+  routeMotionObserver?.disconnect();
+  routeMotionObserver = null;
+  routeMotionCleanup?.();
+  routeMotionCleanup = null;
+}
+
+function prepareRouteMotion(routeChanged) {
+  if (!routeChanged || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+  const entrance = app.querySelector(".public-main > section:first-child, .get-started, .my-jobs, .staff-app, .access-denied");
+  entrance?.classList.add("route-enter");
+  if (entrance) window.setTimeout(() => entrance.classList.remove("route-enter"), 420);
+
+  const targets = [...app.querySelectorAll(
+    ".public-main > section:not(:first-child), .staff-content > :not(.metric-grid):not(.active-jobs-grid), " +
+    ".metric-grid > *, .active-jobs-grid > *, .printer-grid > *, .jobs-grid > *, .get-started, .my-jobs, .access-denied"
+  )].filter((target) => target !== entrance);
+  if (!targets.length) return;
+
+  app.classList.add("motion-enhanced");
+  const staggerGroups = new Map();
+  const revealTarget = (target) => {
+    target.classList.add("is-visible");
+    routeMotionObserver?.unobserve(target);
+  };
+  if (typeof window.IntersectionObserver === "function") {
+    routeMotionObserver = new window.IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) revealTarget(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0 });
+  }
+
+  targets.forEach((target) => {
+    target.classList.add("motion-reveal");
+    const parent = target.parentElement;
+    if (parent?.matches(".metric-grid, .active-jobs-grid, .printer-grid, .jobs-grid")) {
+      const index = staggerGroups.get(parent) || 0;
+      target.style.setProperty("--motion-delay", `${Math.min(index, 4) * 42}ms`);
+      staggerGroups.set(parent, index + 1);
+    }
+    routeMotionObserver?.observe(target);
+  });
+
+  if (!routeMotionObserver) {
+    const pendingTargets = new Set(targets);
+    let frame = 0;
+    const cleanup = () => {
+      window.removeEventListener("scroll", scheduleReveal, false);
+      window.removeEventListener("resize", scheduleReveal, false);
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = 0;
+      if (routeMotionCleanup === cleanup) routeMotionCleanup = null;
+    };
+    const revealVisibleTargets = () => {
+      frame = 0;
+      pendingTargets.forEach((target) => {
+        const rect = target.getBoundingClientRect();
+        if (rect.top <= window.innerHeight * 1.12 && rect.bottom >= 0) {
+          target.classList.add("is-visible");
+          pendingTargets.delete(target);
+        }
+      });
+      if (!pendingTargets.size) cleanup();
+    };
+    function scheduleReveal() {
+      if (!frame) frame = window.requestAnimationFrame(revealVisibleTargets);
+    }
+    window.addEventListener("scroll", scheduleReveal, { passive: true });
+    window.addEventListener("resize", scheduleReveal, { passive: true });
+    routeMotionCleanup = cleanup;
+    scheduleReveal();
+  }
+}
 
 const savedDraft = jobsService.getDraft();
 if (savedDraft) {
@@ -143,8 +222,12 @@ function parseRoute() {
 
 async function render() {
   const revision = ++renderRevision;
+  clearRouteMotion();
   modelPreviewModule?.disposeModelPreview();
   const route = parseRoute();
+  const routeKey = `${route.page}:${route.id || ""}:${route.staffId || ""}`;
+  const routeChanged = routeKey !== lastRenderedRouteKey;
+  lastRenderedRouteKey = routeKey;
   if (route.redirect) {
     location.hash = "#/staff";
     return;
@@ -153,21 +236,22 @@ async function render() {
     ? PERMISSIONS.HOURS_ADMIN
     : ROUTE_PERMISSIONS[route.page];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    document.title = "Access restricted · 3D Print Farm · v1.6 Beta";
+    document.title = "Access restricted · 3D Print Farm · v2.0.0";
     app.innerHTML = accessDeniedPage(state, requiredPermission);
+    prepareRouteMotion(routeChanged);
     window.scrollTo({ top: 0, behavior: "auto" });
     return;
   }
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v1.6-beta · Version 1.6 Beta";
+    document.title = "Staff Portal · School 3D Print Farm — v2.0.0";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v1.6-beta · Version 1.6 Beta";
+    document.title = "Get Started · School 3D Print Farm — v2.0.0";
   } else if (route.page === "my-jobs") {
-    document.title = "My Jobs · School 3D Print Farm — v1.6-beta · Version 1.6 Beta";
+    document.title = "My Jobs · School 3D Print Farm — v2.0.0";
   } else {
-    document.title = "School 3D Print Farm Website — v1.6-beta · Version 1.6 Beta";
+    document.title = "School 3D Print Farm Website — v2.0.0";
   }
 
   if (route.page === "home") {
@@ -191,6 +275,7 @@ async function render() {
   } else if (route.page === "job") {
     app.innerHTML = await jobDetailsPage(route.id);
   }
+  prepareRouteMotion(routeChanged);
 
   if (route.page === "get-started" && state.wizard.modelFile && !state.wizard.submittedJob) {
     const selectedFile = state.wizard.modelFile;
