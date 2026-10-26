@@ -6,6 +6,55 @@ import { partArtwork } from "./visualComponents.js?v=20";
 
 const safeSwatch = (hexColor) => (/^#[\da-f]{6}$/i.test(hexColor || "") ? hexColor : "#2b2b2b");
 
+
+const PRINTERS = [
+  {
+    name: "Bambu Lab A1 mini",
+    image: "./assets/printers/a1-mini.jpg",
+    imageAlt: "Bambu Lab A1 mini desktop 3D printer",
+    category: "COMPACT FORMAT",
+    description: "A compact option for smaller projects that fit within its usable print area.",
+    volume: "180 × 180 × 180",
+    colourClass: "printer-colour-single",
+    colourTitle: "Single-colour printing only",
+    colourDetail: "A1 mini jobs in our print farm are printed in one colour.",
+    projects: "Small models, miniatures, prototypes, desk accessories, and small replacement parts.",
+    materials: "PLA and PETG are common examples. Available choices depend on current farm stock and job review.",
+    size: "The model must fit the usable build area. Geometry, orientation, supports, and clearances affect fit. Larger designs may need splitting; ask staff whether a multi-part job is feasible."
+  },
+  {
+    name: "Bambu Lab H2S",
+    image: "./assets/printers/h2s.jpg",
+    imageAlt: "Bambu Lab H2S enclosed 3D printer",
+    category: "LARGER FORMAT",
+    description: "A larger build area for projects that need more room.",
+    volume: "340 × 320 × 340",
+    colourClass: "printer-colour-multi",
+    colourTitle: "Multi-colour printing available",
+    colourDetail: "The H2S is the only printer model in our farm available for multi-colour jobs.",
+    projects: "Larger prototypes, enclosures, functional components, larger models, and multi-part projects that benefit from extra room.",
+    materials: "PLA and PETG are common examples. Bambu Lab lists a broader compatible range; farm choices still depend on stock and job review.",
+    size: "The larger build area can fit some bigger parts in one piece. The model must still fit the usable area; geometry, orientation, supports, and clearances affect feasibility."
+  }
+];
+
+function renderPrinterCard(printer) {
+  return '<article class="printer-card">'
+    + '<div class="printer-card-image"><img src="' + esc(printer.image) + '" alt="' + esc(printer.imageAlt) + '" loading="lazy" decoding="async" /></div>'
+    + '<div class="printer-card-body">'
+    + '<span class="printer-card-kicker">' + esc(printer.category) + ' · FDM</span>'
+    + '<h3>' + esc(printer.name) + '</h3>'
+    + '<p class="printer-card-description">' + esc(printer.description) + '</p>'
+    + '<div class="printer-volume"><div><span>Maximum build volume</span><small>Width × depth × height</small></div><strong>' + esc(printer.volume) + ' <small>mm</small></strong></div>'
+    + '<div class="printer-technology"><span>Printing technology</span><strong>Fused Deposition Modeling (FDM)</strong><small>Melted plastic filament is laid down in thin layers.</small></div>'
+    + '<div class="printer-colour-status ' + esc(printer.colourClass) + '"><span class="printer-status-dot" aria-hidden="true"></span><div><strong>' + esc(printer.colourTitle) + '</strong><p>' + esc(printer.colourDetail) + '</p></div></div>'
+    + '<div class="printer-card-details">'
+    + '<div><h4>Typical projects</h4><p>' + esc(printer.projects) + '</p></div>'
+    + '<div><h4>Material guidance</h4><p>' + esc(printer.materials) + '</p></div>'
+    + '<div class="printer-size-guidance"><h4>Size guidance</h4><p>' + esc(printer.size) + '</p></div>'
+    + '</div></div></article>';
+}
+
 export function homePage(scrollTo = "", state, inventory = []) {
   const stockRows = inventory.length
     ? inventory.map((item) => {
@@ -52,6 +101,14 @@ export function homePage(scrollTo = "", state, inventory = []) {
       <article>${partArtwork("case")}<div><h3>Prototype the next thing.</h3><span>MODEL / TEST / ITERATE</span></div></article>
       <article>${partArtwork("bracket")}<div><h3>Make the work work better.</h3><span>TOOL / FIXTURE / EVERYDAY PART</span></div></article>
     </div>
+  </section>
+  <section class="printer-section section-pad" id="printers" aria-labelledby="printers-title">
+    <div class="section-heading">
+      <div><span class="eyebrow"><i></i> OUR EQUIPMENT</span><h2 id="printers-title">Our Printers</h2></div>
+      <p>Different printers suit different object sizes and colour needs. Staff review each request and assign a printer based on model fit, available materials, and job requirements.</p>
+    </div>
+    <div class="printer-grid">${PRINTERS.map(renderPrinterCard).join("")}</div>
+    <p class="printer-service-note">Build volumes are nominal maximums, not a printability guarantee. Final feasibility depends on the submitted model, dimensions, orientation, supports, clearances, available material, and staff review.</p>
   </section>
   <section class="faq-section section-pad" id="faq">
     <div class="faq-intro">

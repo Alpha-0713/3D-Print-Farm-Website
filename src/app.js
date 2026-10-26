@@ -2,7 +2,7 @@ import { contributionsService, hoursService, inventoryService, jobsService, rgbF
 import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=20";
 import { notificationsService } from "./notificationsService.js?v=20";
 import { dateTime, esc, printNumber } from "./pageShared.js?v=20";
-import { accessDeniedPage, homePage } from "./publicPages.js?v=20";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=21";
 import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=20";
 import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=20";
 import { getStartedPage } from "./requestWizard.js?v=20";

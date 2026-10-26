@@ -1,8 +1,8 @@
-# 3D Print Farm Website — v1.6 Beta
+# 3D Print Farm Website — v1.7 Beta
 
-**Version 1.6 Beta** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, and filament availability.
+**Version 1.7 Beta** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, filament availability, and print farm equipment.
 
-![version](https://img.shields.io/badge/version-v1.6--beta-blue)
+![version](https://img.shields.io/badge/version-v1.7--beta-blue)
 ![release](https://img.shields.io/badge/status-beta-orange)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JavaScript-f7df1e?logo=javascript&logoColor=black)
 ![storage](https://img.shields.io/badge/storage-browser%20localStorage-lightgrey)
@@ -10,6 +10,8 @@
 > **Beta prototype:** The identities and access controls are for demonstration only. Do not use this application with real student information, production requests, secured staff work, or authoritative hour or inventory records.
 
 ## Release summary
+
+v1.7 Beta adds an **Our Printers** section to the public homepage, immediately above the FAQ. It describes the Bambu Lab A1 mini and Bambu Lab H2S, including their build volumes, FDM technology, example projects, and material and size guidance. The farm's A1 mini jobs are single-colour only; the H2S is the only farm model available for multi-colour jobs. Printer assignment and printability remain subject to job review and available materials.
 
 v1.6 Beta redesigns **Materials** as a filament availability list. Level 3 and Level 4 staff can set **Low Stock** and **Available** independently, add a filament with its verified HEX color, and delete an entry after confirmation. The app derives the RGB value from HEX. Levels 1–4 see the selected filament's swatch, material, color name, HEX, RGB, and status during request submission; low-stock filaments remain selectable when Available is on.
 
@@ -66,7 +68,7 @@ Balances, requests, and transactions are stored in the existing `three-d-print-f
 
 | Route | Access |
 | --- | --- |
-| `#/` | Public home page and FAQ |
+| `#/` | Public home page, Our Printers, and FAQ |
 | `#/get-started` | All identities; print request workflow |
 | `#/my-jobs` | All identities; local demo requests for the selected identity |
 | `#/staff` | Level 2 and above |
@@ -84,9 +86,18 @@ Legacy links to `#/staff/queue` redirect to the Staff Overview. The former stude
 
 ## Existing features
 
-The public homepage includes project information, use cases, and FAQs. Get Started collects a model file, print settings, and project details across a four-step request workflow. It accepts STL, 3MF, and OBJ files up to **25 MB** and previews models in the browser. A direct HTTPS model URL can be loaded when its host permits cross-origin access. Model bytes are used for preview and validation only; no model is uploaded.
+The public homepage includes project information, use cases, printer information, and FAQs. Get Started collects a model file, print settings, and project details across a four-step request workflow. It accepts STL, 3MF, and OBJ files up to **25 MB** and previews models in the browser. A direct HTTPS model URL can be loaded when its host permits cross-origin access. Model bytes are used for preview and validation only; no model is uploaded.
 
 The Staff Portal retains job review, active job assignment, job status updates, simulated pickup notifications, and filament availability management. The Materials list shows the actual color swatch, plastic type, color name, normalized HEX, and derived RGB. Level 3 and Level 4 staff can independently toggle Low Stock and Available; unavailable entries remain visible to staff, and confirmed deletion removes an entry from request choices. New entries start with Low Stock off and Available on. In the request workflow, available low-stock filaments remain selectable and display a warning; unavailable or deleted entries are not offered. The Overview's Recent Jobs table shows each print name in white above a muted, shortened `PFN-****` print number; file and material columns are omitted. The same shortened number appears throughout job pages and when copied. Student contribution records are available to Level 4 in the combined Hours activity history. These actions update local demo data only.
+
+## Our Printers
+
+The public home page's **Our Printers** cards are rendered from the `PRINTERS` data in `src/publicPages.js`. Their product photos are stored locally in `assets/printers/` so the page does not hotlink them.
+
+- **Bambu Lab A1 mini:** 180 × 180 × 180 mm build volume (width × depth × height), FDM, and single-colour printing only in this farm. See the [official product page](https://ca.store.bambulab.com/products/a1-mini) and [Quick Start Guide](https://cdn1.bambulab.com/documentation/quick-start-f507128172bdf/Quick%20start%20guide%20-%20A1%20mini-EN.pdf).
+- **Bambu Lab H2S:** 340 × 320 × 340 mm build volume (width × depth × height), FDM, and the only farm model available for multi-colour jobs. See the [official product page](https://us.store.bambulab.com/en/products/h2s) and [technical specifications](https://bambulab.com/it/support/buying-guide).
+
+PLA and PETG are examples of common materials, not a promise that every colour or type is stocked. The H2S manufacturer's broader compatibility does not expand the farm's material offerings. Build volumes are nominal maximums; geometry, orientation, supports, and clearances affect whether a model fits. Larger A1 mini projects may need splitting; confirm with staff whether a multi-part job is feasible. The H2S's optional laser or cutting configurations are not print farm services.
 
 ## Data, setup, and limitations
 
@@ -98,6 +109,10 @@ The repository has no backend, database, Google authentication, email delivery, 
 
 ~~~text
 .
+├── assets/
+│   └── printers/
+│       ├── a1-mini.jpg
+│       └── h2s.jpg
 ├── index.html
 ├── favicon.svg
 ├── README.md
@@ -106,7 +121,7 @@ The repository has no backend, database, Google authentication, email delivery, 
     ├── authorization.js          # Central role, permission, route, and action definitions
     ├── authService.js            # Demo identities and identity switching boundary
     ├── hoursPages.js             # Level 2 and 3 personal Hours and Level 4 combined management view
-    ├── publicPages.js            # Public home, FAQ, and access-denied page
+    ├── publicPages.js            # Public home, Our Printers, FAQ, and access-denied page
     ├── studentPages.js           # Demo My Jobs page
     ├── staffPages.js             # Staff portal and materials
     ├── requestWizard.js          # Print request workflow

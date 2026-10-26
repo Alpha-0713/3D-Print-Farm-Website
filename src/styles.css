@@ -96,6 +96,35 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .use-grid h3 { margin: 0; font-size: 17px; font-weight: 520; }
 .use-grid article > div:last-child span { color: var(--quiet); font-size: 7px; letter-spacing: .13em; }
 
+.printer-section { padding-top: 94px; padding-bottom: 100px; background: var(--bg); }
+.printer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.printer-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.printer-card-image { width: 100%; aspect-ratio: 3 / 2; overflow: hidden; background: #f1f2ef; }
+.printer-card-image img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center 48%; }
+.printer-card-body { padding: 22px; }
+.printer-card-kicker { color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: .18em; }
+.printer-card h3 { margin: 7px 0 0; font-size: clamp(21px, 2.2vw, 29px); line-height: 1.15; letter-spacing: -.045em; font-weight: 570; }
+.printer-card-description { margin: 7px 0 17px; color: var(--muted); font-size: 11px; }
+.printer-volume { min-width: 0; padding: 13px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.printer-volume > div { display: flex; flex-direction: column; gap: 3px; }
+.printer-volume span { color: var(--text-secondary); font-size: 10px; font-weight: 600; }
+.printer-volume > div small { color: var(--quiet); font-size: 8px; }
+.printer-volume strong { color: var(--text-strong); font-size: clamp(17px, 1.8vw, 24px); line-height: 1.15; letter-spacing: -.035em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.printer-volume strong small { color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: 0; }
+.printer-technology { margin: 13px 0; display: grid; grid-template-columns: minmax(110px, .55fr) 1fr; gap: 3px 12px; }
+.printer-technology span { color: var(--muted); font-size: 9px; }
+.printer-technology strong { color: var(--text-secondary); font-size: 10px; font-weight: 560; }
+.printer-technology small { grid-column: 2; color: var(--quiet); font-size: 9px; }
+.printer-colour-status { min-width: 0; margin: 13px 0 17px; padding: 11px 12px; display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--border); background: var(--surface-soft); }
+.printer-status-dot { width: 7px; height: 7px; flex: 0 0 auto; margin-top: 5px; border-radius: 50%; background: var(--muted); }
+.printer-colour-multi .printer-status-dot { background: var(--accent-primary); }
+.printer-colour-status strong { display: block; color: var(--text-strong); font-size: 10px; font-weight: 650; }
+.printer-colour-status p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.printer-card-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 18px; padding-top: 15px; border-top: 1px solid var(--border); }
+.printer-card-details h4 { margin: 0 0 4px; color: var(--text-secondary); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.printer-card-details p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.printer-size-guidance { grid-column: 1 / -1; }
+.printer-service-note { max-width: 950px; margin: 19px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .faq-section { padding-top: 91px; padding-bottom: 100px; display: grid; grid-template-columns: .78fr 1.22fr; gap: 8vw; background: var(--surface-raised); }
 .faq-intro h2 { font-size: clamp(36px, 4vw, 52px); }
 .faq-intro p { max-width: 280px; color: var(--muted); font-size: 12px; }
@@ -434,6 +463,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .active-jobs-grid { grid-template-columns: repeat(2,1fr); }
 }
 @media (max-width: 767px) {
+  body { min-width: 0; }
   html { scroll-padding-top: 68px; }
   .public-header { height: 64px; }
   .header-inner { padding: 0 5%; }
@@ -463,8 +493,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .use-grid { grid-template-columns: 1fr; gap: 14px; }
   .use-grid .art-frame { height: 220px; }
   .use-grid article > div:last-child span { font-size: 6px; }
+  .printer-section { padding-top: 65px; padding-bottom: 68px; }
+  .printer-grid { grid-template-columns: 1fr; gap: 14px; }
+  .printer-card-body { padding: 18px 16px; }
+  .printer-card h3 { font-size: 24px; }
+  .printer-volume { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .printer-volume strong { font-size: 23px; }
+  .printer-technology { grid-template-columns: 1fr; gap: 3px; }
+  .printer-technology small { grid-column: 1; }
   .faq-section { padding-top: 61px; padding-bottom: 65px; grid-template-columns: 1fr; gap: 18px; }
   .faq-intro h2 { font-size: 42px; }
+  .printer-card-details { grid-template-columns: 1fr; }
+  .printer-size-guidance { grid-column: auto; }
   .faq-list summary { font-size: 11px; }
   .final-cta { min-height: 0; padding-top: 38px; padding-bottom: 38px; align-items: start; flex-direction: column; gap: 16px; }
   .final-cta h2 { font-size: 47px; }
