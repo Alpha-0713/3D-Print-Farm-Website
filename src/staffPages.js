@@ -399,7 +399,7 @@ export async function jobDetailsPage(jobId) {
             ${esc(job.fileName)}\
           </strong>\
           <small>\
-            ${esc(job.fileSize)} · Filename only in this demo\
+            ${job.modelUrl ? "Link included with request" : `${esc(job.fileSize)} · Filename only in this demo`}\
           </small>\
         </div>\
         <span class="material-chip">\
@@ -416,6 +416,7 @@ export async function jobDetailsPage(jobId) {
   </strong>\
 </div>`).join("")}\
       </div>\
+      ${job.modelUrl ? `<div class="notes-box"><span>Model link</span><p>${esc(job.modelUrl)}</p></div>` : ""}\
       <div class="notes-box">\
         <span>\
           Project notes\

@@ -43,6 +43,10 @@ function fieldSelect(name, label, options, selected, hint = "") {
 
 function fileSummary(state) {
   const file = state.wizard.file;
+  if (!file && state.wizard.linkUrl.trim()) return `<div class="selected-file">\
+  <div class="file-thumb"><strong aria-hidden="true">↗</strong></div>\
+  <div class="file-info"><strong>Model link provided</strong><span>No preview; the link will be included with your request.</span></div>\
+</div>`;
   const format = file?.extension?.toUpperCase() || file?.name?.split(".").pop()?.toUpperCase() || "MODEL";
   return file ? `<div class="selected-file">\
   <div class="file-thumb">\
@@ -56,7 +60,7 @@ function fileSummary(state) {
       ${esc(file.name)}\
     </strong>\
     <span>\
-      ${formatBytes(file.sizeBytes)} · ${state.wizard.modelSource === "link" ? "loaded from link" : "on this device"}\
+      ${formatBytes(file.sizeBytes)} · on this device\
     </span>\
   </div>\
   <label for="model-file" class="text-link selected-file-replace">Replace</label>\
@@ -142,21 +146,18 @@ function wizardPanel(state, filaments) {
 <p class="form-feedback" id="file-feedback" role="status" aria-live="polite">\
   ${esc(w.fileFeedback || "")}\
 </p>\
-<div class="model-link-divider"><span>OR LOAD FROM A LINK</span></div>\
-<form class="model-link-form" data-form="model-link" novalidate>\
-  <label class="field">\
+<div class="model-link-divider"><span>OR PASTE A MODEL LINK</span></div>\
+<label class="field model-link-field">\
     <span>Model URL</span>\
     <input id="model-link-url" name="modelUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com/model.stl" value="${esc(w.linkUrl || "")}" aria-describedby="model-link-help" />\
-    <small id="model-link-help">Use a direct HTTPS download. The host must allow browser access (CORS); sign-in pages and private links cannot be loaded.</small>\
-  </label>\
-  <button type="submit" class="button button-outline" ${w.loadingLink ? "disabled" : ""}>${w.loadingLink ? "Loading link…" : "Load model link"}</button>\
-</form>\
+    <small id="model-link-help">The link will be included with your request. It won’t be opened or previewed here.</small>\
+</label>\
 <div class="form-note">\
   <span>\
     ⓘ\
   </span>\
   <p>\
-    The actual model is previewed locally in this browser. The demo stores only the file name and size; it does not upload file contents.\
+    Files are previewed locally in this browser. The demo stores the file name and size; it does not upload file contents. Model links are passed along with your request.\
   </p>\
 </div>`
     : w.step === 2 ? `<div class="form-section-head">\
@@ -363,7 +364,8 @@ ${reviewCard(w)}\
 }
 
 function reviewCard(w) {
-  const rows = [["File", w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : "Choose a file"], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", normalizeOptionalNote(w.notes) || "None"]];
+  const model = w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : w.linkUrl.trim() || "Choose a file or paste a model link";
+  const rows = [["Model", model], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", normalizeOptionalNote(w.notes) || "None"]];
   return `<div class="review-card">\
   ${rows.map(([label, value], i) => `<div class="review-row ${i > 4 ? "review-detail" : ""}">\
   <span>\

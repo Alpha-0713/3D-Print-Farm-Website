@@ -4,7 +4,7 @@ import { commitPage } from "./pageCommit.js?v=2.2&rev=5";
 import { syncFloatingControls } from "./floatingControls.js?v=2.2&rev=5";
 import { syncSidebarSelection } from "./sidebarSelection.js?v=2.2&rev=5";
 import { contributionsService, hoursService, inventoryService, jobsService, resetLocalData, rgbFromHex } from "./services.js?v=2.2&rev=5";
-import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=2.2&rev=5";
+import { filesService } from "./filesService.js?v=2.2&rev=5";
 import { notificationsService } from "./notificationsService.js?v=2.2&rev=5";
 import { dateTime, esc } from "./pageShared.js?v=2.2&rev=5";
 import { accessDeniedPage, homePage } from "./publicPages.js?v=2.2&rev=5";
@@ -39,9 +39,6 @@ const state = {
     previewStatus: "empty",
     fileFeedback: "",
     linkUrl: "",
-    modelSource: "",
-    sourceUrl: "",
-    loadingLink: false,
     projectName: "",
     purpose: "Personal project",
     notes: "",
@@ -121,7 +118,6 @@ function decodeRouteId(value) {
 
 let modelPreviewModule;
 let renderRevision = 0;
-let linkController = null;
 let lastRenderedRouteKey = "";
 let routeMotionObserver = null;
 let routeMotionCleanup = null;
@@ -211,10 +207,6 @@ if (savedDraft) {
     modelFile: null,
     previewStatus: "empty",
     fileFeedback: "",
-    linkUrl: "",
-    modelSource: "",
-    sourceUrl: "",
-    loadingLink: false,
     submittedJob: null,
   });
 }
@@ -382,11 +374,9 @@ function toast(message, kind = "success") {
   }, 3600);
 }
 
-async function setFile(file, { sourceUrl = "" } = {}) {
+async function setFile(file) {
   if (!file) return;
-  linkController?.abort();
-  linkController = null;
-  state.wizard.loadingLink = false;
+  state.wizard.linkUrl = "";
 
   const selection = filesService.inspectSelection(file);
   if (!selection.valid) {
@@ -394,8 +384,6 @@ async function setFile(file, { sourceUrl = "" } = {}) {
     state.wizard.modelFile = null;
     state.wizard.previewStatus = "error";
     state.wizard.fileFeedback = selection.error;
-    state.wizard.modelSource = "";
-    state.wizard.sourceUrl = "";
     await render();
     return;
   }
@@ -403,131 +391,8 @@ async function setFile(file, { sourceUrl = "" } = {}) {
   state.wizard.file = selection.metadata;
   state.wizard.modelFile = file;
   state.wizard.previewStatus = "loading";
-  state.wizard.fileFeedback = sourceUrl ? "Link loaded. Checking model geometry…" : "Checking model geometry…";
-  state.wizard.modelSource = sourceUrl ? "link" : "device";
-  state.wizard.sourceUrl = sourceUrl;
+  state.wizard.fileFeedback = "Checking model geometry…";
   await render();
-}
-
-function linkedFileName(response, requestedUrl) {
-  const disposition = response.headers.get("content-disposition") || "";
-  let headerName = "";
-  const encoded = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
-  const plain = disposition.match(/filename\s*=\s*"?([^";]+)"?/i);
-  try { headerName = encoded ? decodeURIComponent(encoded[1].trim()) : (plain?.[1]?.trim() || ""); } catch { headerName = plain?.[1]?.trim() || ""; }
-
-  const candidates = [headerName, response.url, requestedUrl];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    let name = candidate;
-    try {
-      const url = new URL(candidate);
-      name = decodeURIComponent(url.pathname.split("/").pop() || "");
-    } catch {
-      name = candidate.split(/[\\/]/).pop() || "";
-    }
-    name = name.replace(/[\/\x00-\x1f]/g, "").replace(/\\/g, "").trim();
-    const extension = getModelFileExtension(name);
-    if (["stl", "3mf", "obj"].includes(extension)) return name;
-  }
-  throw new Error("The link does not point to a supported STL, 3MF, or OBJ file.");
-}
-
-async function loadModelFromLink(value) {
-  const requested = String(value || "").trim();
-  state.wizard.linkUrl = requested;
-  state.wizard.file = null;
-  state.wizard.modelFile = null;
-  state.wizard.previewStatus = "empty";
-  state.wizard.modelSource = "";
-  state.wizard.sourceUrl = "";
-  state.wizard.loadingLink = false;
-  linkController?.abort();
-  linkController = null;
-
-  const checked = filesService.inspectUrl(requested);
-  if (!checked.valid) {
-    state.wizard.fileFeedback = checked.error;
-    await render();
-    return;
-  }
-
-  const controller = new AbortController();
-  linkController = controller;
-  let timedOut = false;
-  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
-  state.wizard.loadingLink = true;
-  state.wizard.fileFeedback = "Retrieving the linked model…";
-  await render();
-
-  try {
-    const response = await fetch(checked.url, {
-      method: "GET",
-      mode: "cors",
-      credentials: "omit",
-      redirect: "follow",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`The model link returned HTTP ${response.status}.`);
-    const finalUrl = new URL(response.url || checked.url);
-    if (finalUrl.protocol !== "https:") throw new Error("The model link redirected away from HTTPS. Use a direct HTTPS file URL.");
-
-    const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (contentType === "text/html" || contentType === "application/xhtml+xml" || contentType === "application/json") {
-      throw new Error("The link returned a web page instead of a model file. Use a direct download URL.");
-    }
-    const contentLength = Number(response.headers.get("content-length"));
-    if (Number.isFinite(contentLength) && contentLength > MAX_MODEL_FILE_SIZE) {
-      throw new Error("The linked model is larger than the 25 MB demo limit.");
-    }
-
-    const fileName = linkedFileName(response, checked.url);
-    const reader = response.body?.getReader();
-    let blob;
-    if (reader) {
-      const chunks = [];
-      let total = 0;
-      while (true) {
-        const { done, value: chunk } = await reader.read();
-        if (done) break;
-        total += chunk.byteLength;
-        if (total > MAX_MODEL_FILE_SIZE) {
-          await reader.cancel();
-          throw new Error("The linked model is larger than the 25 MB demo limit.");
-        }
-        chunks.push(chunk);
-      }
-      blob = new Blob(chunks, { type: contentType || "application/octet-stream" });
-    } else {
-      blob = await response.blob();
-    }
-    if (!blob.size) throw new Error("The linked model file is empty.");
-    if (blob.size > MAX_MODEL_FILE_SIZE) throw new Error("The linked model is larger than the 25 MB demo limit.");
-
-    linkController = null;
-    state.wizard.loadingLink = false;
-    await setFile(new File([blob], fileName, { type: blob.type || "application/octet-stream" }), { sourceUrl: checked.url });
-  } catch (error) {
-    if (linkController !== controller) return;
-    state.wizard.loadingLink = false;
-    state.wizard.file = null;
-    state.wizard.modelFile = null;
-    state.wizard.previewStatus = "error";
-    state.wizard.modelSource = "";
-    state.wizard.sourceUrl = "";
-    state.wizard.fileFeedback = timedOut
-      ? "The download timed out. Try another direct HTTPS model link."
-      : error.name === "AbortError"
-        ? "The download was cancelled. Try again with a direct HTTPS model link."
-        : error instanceof TypeError
-          ? "The link could not be read. It may require sign-in or block browser access (CORS). Use a direct HTTPS download URL."
-          : (error.message || "The model could not be downloaded from this link.");
-    await render();
-  } finally {
-    clearTimeout(timeout);
-    if (linkController === controller) linkController = null;
-  }
 }
 
 function openCompletionDialog(job) {
@@ -787,12 +652,13 @@ async function doAction(action, target) {
       dialog?.close();
       dialog?.remove();
     } else if (action === "wizard-next") {
-      if (state.wizard.step === 1 && (!state.wizard.file || !state.wizard.modelFile)) {
-        toast("Choose an STL, 3MF, or OBJ file, or load a model link.", "error");
+      const hasModelLink = Boolean(state.wizard.linkUrl.trim());
+      if (state.wizard.step === 1 && !hasModelLink && (!state.wizard.file || !state.wizard.modelFile)) {
+        toast("Choose an STL, 3MF, or OBJ file, or paste a model link.", "error");
         document.querySelector("#model-file")?.focus();
         return;
       }
-      if (state.wizard.step === 1 && state.wizard.previewStatus !== "ready") {
+      if (state.wizard.step === 1 && !hasModelLink && state.wizard.previewStatus !== "ready") {
         toast(state.wizard.previewStatus === "loading" ? "Wait for the model preview to finish loading." : "Fix the model preview error before continuing.", "error");
         return;
       }
@@ -829,14 +695,12 @@ async function doAction(action, target) {
       state.wizard.modelFile = null;
       state.wizard.previewStatus = "empty";
       state.wizard.fileFeedback = "";
-      state.wizard.modelSource = "";
-      state.wizard.sourceUrl = "";
       state.wizard.linkUrl = "";
       await render();
     } else if (action === "save-draft") {
-      const { file, modelFile, previewStatus, fileFeedback, linkUrl, modelSource, sourceUrl, loadingLink, submittedJob, step, ...fields } = state.wizard;
+      const { file, modelFile, previewStatus, fileFeedback, submittedJob, step, ...fields } = state.wizard;
       if (jobsService.saveDraft(fields)) {
-        toast("Draft saved on this device. You will need to choose the model file again.");
+        toast("Draft saved on this device. Model links are saved; local files must be chosen again.");
       } else {
         toast("Draft could not be saved in this browser.", "error");
       }
@@ -848,9 +712,9 @@ async function doAction(action, target) {
       state.wizard.submitting = true;
 
       try {
-        const { modelFile, previewStatus, fileFeedback, linkUrl, modelSource, sourceUrl, loadingLink, ...request } = state.wizard;
+        const { modelFile, previewStatus, fileFeedback, linkUrl, ...request } = state.wizard;
         request.notes = normalizeOptionalNote(request.notes);
-        const job = await jobsService.createJob({ ...request, file: state.wizard.file });
+        const job = await jobsService.createJob({ ...request, modelUrl: linkUrl.trim(), file: state.wizard.file });
         state.wizard.submittedJob = job;
         state.wizard.submitting = false;
         jobsService.discardDraft();
@@ -869,9 +733,6 @@ async function doAction(action, target) {
         previewStatus: "empty",
         fileFeedback: "",
         linkUrl: "",
-        modelSource: "",
-        sourceUrl: "",
-        loadingLink: false,
         projectName: "",
         purpose: "Personal project",
         notes: "",
@@ -911,11 +772,6 @@ app.addEventListener("submit", async (event) => {
   const requiredPermission = FORM_PERMISSIONS[action];
   if (requiredPermission && !authService.can(requiredPermission)) {
     toast("Access denied: this demo identity cannot " + (PERMISSION_LABELS[requiredPermission] || "submit that form") + ".", "error");
-    return;
-  }
-
-  if (action === "model-link") {
-    await loadModelFromLink(values.modelUrl);
     return;
   }
 
@@ -1067,7 +923,15 @@ app.addEventListener("input", (event) => {
     target.setCustomValidity(target.value && !rgb ? "Use a six-digit HEX value in the format #RRGGBB." : "");
   }
 
-  if (target.matches("#model-link-url")) state.wizard.linkUrl = target.value;
+  if (target.matches("#model-link-url")) {
+    state.wizard.linkUrl = target.value;
+    if (target.value.trim()) {
+      state.wizard.file = null;
+      state.wizard.modelFile = null;
+      state.wizard.previewStatus = "empty";
+      state.wizard.fileFeedback = "";
+    }
+  }
 
   if (target.matches("[data-field]")) {
     const key = target.dataset.field;

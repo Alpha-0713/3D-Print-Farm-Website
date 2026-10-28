@@ -267,9 +267,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .form-feedback { min-height: 16px; margin: 5px 0 0; color: var(--error); font-size: var(--text-caption); line-height: var(--line-compact); }
 .model-link-divider { display: flex; align-items: center; gap: 10px; margin: 11px 0; color: var(--quiet); font-size: var(--text-caption); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-label); }
 .model-link-divider::before, .model-link-divider::after { content: ""; height: 1px; flex: 1; background: var(--surface-hover); }
-.model-link-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
-.model-link-form .button { min-height: 41px; padding: 0 12px; font-size: var(--text-button); white-space: nowrap; }
-.model-link-form .field small { line-height: var(--line-body); }
+.model-link-field small { line-height: var(--line-body); }
 .form-note { display: flex; gap: 9px; margin-top: 10px; color: var(--muted); }
 .form-note span { color: var(--lime); }
 .form-note p { margin: 0; font-size: var(--text-caption); }
@@ -612,8 +610,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .review-actions .button { padding: 0 10px; font-size: var(--text-button); }
   .wizard-aside { padding-top: 0; }
   .preview-art { height: 215px; }
-  .model-link-form { grid-template-columns: 1fr; }
-  .model-link-form .button { width: 100%; }
   .good-to-know { display: none; }
   .review-row { grid-template-columns: 105px 1fr; gap: 8px; padding: 9px; }
   .confirmation-panel { min-height: 0; margin-top: 5px; padding: var(--panel-inset); }

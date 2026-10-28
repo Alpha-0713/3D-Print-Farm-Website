@@ -418,7 +418,9 @@ function validatePayload(payload) {
     payload && typeof payload.projectName === "string" && payload.projectName.trim(),
     "Enter a project name.",
   );
-  filesService.validateMetadata(payload.file);
+  const modelUrl = typeof payload.modelUrl === "string" ? payload.modelUrl.trim() : "";
+  assert(modelUrl || payload.file, "Choose a model file or provide a model link.");
+  if (!modelUrl) filesService.validateMetadata(payload.file);
   assert(MATERIALS.some(({ id }) => id === payload.material), "Choose a supported print material.");
   assert(typeof payload.color === "string" && payload.color.trim(), "Choose an available color.");
   const matchesSelection = (item) => (
@@ -500,8 +502,9 @@ export const jobsService = {
         submitterName: currentUser().name,
         submitterEmail: currentUser().email,
         recipientEmail: currentUser().email,
-        fileName: payload.file.name,
-        fileSize: formatFileSize(payload.file.sizeBytes),
+        fileName: payload.modelUrl?.trim() ? "Model link" : payload.file.name,
+        fileSize: payload.modelUrl?.trim() ? "Link provided" : formatFileSize(payload.file.sizeBytes),
+        ...(payload.modelUrl?.trim() ? { modelUrl: payload.modelUrl.trim() } : {}),
         material: payload.material,
         color: payload.color,
         layerHeight: payload.layerHeight || "Not specified",

@@ -39,7 +39,7 @@ export async function myJobDetailsPage(state, jobId) {
     <div class="page-title-row"><div><span class="eyebrow">PRINT REQUEST</span><h1>${esc(job.projectName)}</h1><p>Submitted ${dateTime(job.submittedAt)}</p></div>${statusBadge(job.status)}</div>
     <div class="submitter-detail-layout"><div class="request-detail-body">
       ${pickupDetails(job)}
-      <section class="request-specs"><h2>Request details</h2><dl>${[["Model file", `${job.fileName} · ${job.fileSize}`], ["Material & colour", `${job.material} · ${job.color}`], ["Purpose", job.purpose || "Not specified"], ["Layer height", job.layerHeight || "Not recorded"], ["Infill", job.infill == null ? "Not recorded" : `${job.infill}%`], ["Staff member", job.assignedStaff || "Awaiting assignment"]].map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>
+      <section class="request-specs"><h2>Request details</h2><dl>${[["Model", job.modelUrl || `${job.fileName} · ${job.fileSize}`], ["Material & colour", `${job.material} · ${job.color}`], ["Purpose", job.purpose || "Not specified"], ["Layer height", job.layerHeight || "Not recorded"], ["Infill", job.infill == null ? "Not recorded" : `${job.infill}%`], ["Staff member", job.assignedStaff || "Awaiting assignment"]].map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>
       <div class="request-notes"><h3>Your project notes</h3><p>${esc(job.notes || "No additional notes.")}</p></div></section>
     </div><aside>${jobProgress(job)}</aside></div>
   </main>${footer()}`;
