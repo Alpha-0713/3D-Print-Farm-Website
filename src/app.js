@@ -249,12 +249,12 @@ function makerWorldPreviewFrom(data, value) {
   const design = data?.data?.design || data?.data || data?.design || data;
   const creator = design?.designCreator || design?.creator || {};
   const images = Array.isArray(design?.images) ? design.images : Array.isArray(design?.designPictures) ? design.designPictures : [];
-  const rawImage = design?.coverUrl || design?.cover || design?.coverImage || images[0]?.url || images[0] || "";
+  const rawImage = design?.coverUrl || design?.cover || design?.coverImage || design?.image?.url || images[0]?.url || images[0] || "";
   const count = (...values) => values.find((item) => item !== null && item !== undefined && item !== "" && Number.isFinite(Number(item))) ?? null;
   return {
     url: value,
     title: String(design?.title || design?.name || makerWorldFallbackTitle(value)),
-    creator: String(creator?.name || design?.creatorName || creator?.handle || "MakerWorld creator"),
+    creator: String(creator?.name || design?.creatorName || creator?.handle || design?.author || "MakerWorld creator"),
     avatar: safeMakerWorldImage(creator?.avatar || creator?.avatarUrl || ""),
     image: safeMakerWorldImage(typeof rawImage === "string" ? rawImage : rawImage?.url || ""),
     downloads: count(design?.downloadCount, design?.downloads, design?.stats?.downloadCount),
@@ -279,6 +279,16 @@ async function fetchMakerWorldDesign(designId, signal) {
     }
   }
   throw lastError || new Error("MakerWorld model details are unavailable.");
+}
+
+async function fetchMakerWorldPageMetadata(value, signal) {
+  const endpoint = new URL("https://api.microlink.io/");
+  endpoint.searchParams.set("url", value);
+  const response = await fetch(endpoint, { method: "GET", mode: "cors", credentials: "omit", signal });
+  if (!response.ok) throw new Error(`MakerWorld preview service returned HTTP ${response.status}.`);
+  const result = await response.json();
+  if (result?.status !== "success" || !result?.data) throw new Error("MakerWorld page metadata is unavailable.");
+  return result;
 }
 
 async function renderKeepingModelLinkFocus() {
@@ -312,7 +322,19 @@ function scheduleMakerWorldPreview(value) {
     const controller = new AbortController();
     makerWorldPreviewController = controller;
     try {
-      const data = await fetchMakerWorldDesign(designId, controller.signal);
+      let data;
+      try {
+        data = await fetchMakerWorldDesign(designId, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+      }
+      if (!makerWorldPreviewFrom(data, requestedUrl).image) {
+        try {
+          data = await fetchMakerWorldPageMetadata(requestedUrl, controller.signal);
+        } catch (error) {
+          if (controller.signal.aborted) throw error;
+        }
+      }
       if (controller.signal.aborted || state.wizard.linkUrl.trim() !== requestedUrl) return;
       state.wizard.makerWorldPreview = makerWorldPreviewFrom(data, requestedUrl);
       state.wizard.makerWorldPreviewStatus = state.wizard.makerWorldPreview.image ? "ready" : "details";
