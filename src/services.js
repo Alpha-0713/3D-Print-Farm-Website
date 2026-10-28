@@ -1,3 +1,5 @@
+import { modelFilesStore } from "./modelFilesStore.js?v=2.3";
+import { SIDEBAR_STORAGE_KEY } from "./sidebarState.js?v=2.3";
 import {
   MATERIALS,
   MOCK_JOBS,
@@ -15,7 +17,7 @@ import { claimable, initiallyApproved, isAssignedTo, staffCanSeeJob } from "./jo
 const STORE_KEY = "three-d-print-farm-demo-v3";
 const DRAFT_KEY = "three-d-print-farm-draft-v2";
 export const LOCAL_DATA_KEYS = Object.freeze([
-  STORE_KEY, DRAFT_KEY, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY,
+  STORE_KEY, DRAFT_KEY, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY, SIDEBAR_STORAGE_KEY,
   "three-d-print-farm-accent", "three-d-print-farm-theme", "three-d-print-farm-glass-transparency",
 ]);
 const simulationTimers = new Set();
@@ -380,6 +382,7 @@ const requireStaff = () => assert(authService.can(PERMISSIONS.JOBS_MANAGE), "Acc
 const requireFilamentChange = () => assert(authService.can(PERMISSIONS.FILAMENT_CHANGE), "Access denied: Level 3 or above is required.");
 
 export async function resetLocalData() {
+  await modelFilesStore.clear();
   const reset = () => {
     // Explicit allowlist: never clear unrelated origin data or contact a backend.
     for (const key of LOCAL_DATA_KEYS) localStorage.removeItem(key);
@@ -487,43 +490,57 @@ export const jobsService = {
     );
   },
   async createJob(payload) {
-    return update(() => {
-      assert(authService.can(PERMISSIONS.PRINT_REQUEST_CREATE), "Access denied: request submission is required.");
-      validatePayload(payload);
-      let id;
-      do {
-        id = `PF-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-      } while (state.jobs.some((job) => job.id === id));
-      const submittedAt = nowIso();
-      const job = {
-        id,
-        projectName: payload.projectName.trim(),
-        submitterId: currentUser().id,
-        submitterName: currentUser().name,
-        submitterEmail: currentUser().email,
-        recipientEmail: currentUser().email,
-        fileName: payload.modelUrl?.trim() ? "Model link" : payload.file.name,
-        fileSize: payload.modelUrl?.trim() ? "Link provided" : formatFileSize(payload.file.sizeBytes),
-        ...(payload.modelUrl?.trim() ? { modelUrl: payload.modelUrl.trim() } : {}),
-        material: payload.material,
-        color: payload.color,
-        layerHeight: payload.layerHeight || "Not specified",
-        infill: payload.infill ?? null,
-        purpose: payload.purpose || "Not specified",
-        notes: payload.notes || "",
-        submittedAt,
-        status: "SUBMITTED",
-        initialApproval: null,
-        printAuthorization: null,
-        assignedStaffId: null,
-        assignedStaff: null,
-        pickupLocation: null,
-        completedAt: null,
-        history: [{ type: "SUBMITTED", at: submittedAt, by: currentUser().name }],
-      };
-      state.jobs.unshift(job);
-      return job;
-    });
+    const actorId = currentUser().id;
+    const files = Array.from(payload?.modelFiles || []);
+    if (files.length) {
+      files.forEach(file => { const selection = filesService.inspectSelection(file); assert(selection.valid, selection.error); });
+      assert(files[0].name === payload.file?.name && files[0].size === payload.file?.sizeBytes, "Choose the original model file again before submitting.");
+    }
+    const attachments = files.length ? await modelFilesStore.save(files) : [];
+    try {
+      return await update(() => {
+        assert(currentUser().id === actorId, "Your identity changed. Try submitting again.");
+        assert(authService.can(PERMISSIONS.PRINT_REQUEST_CREATE), "Access denied: request submission is required.");
+        validatePayload(payload);
+        let id;
+        do {
+          id = `PF-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+        } while (state.jobs.some((job) => job.id === id));
+        const submittedAt = nowIso();
+        const job = {
+          id,
+          projectName: payload.projectName.trim(),
+          submitterId: currentUser().id,
+          submitterName: currentUser().name,
+          submitterEmail: currentUser().email,
+          recipientEmail: currentUser().email,
+          fileName: payload.modelUrl?.trim() ? "Model link" : payload.file.name,
+          fileSize: payload.modelUrl?.trim() ? "Link provided" : formatFileSize(payload.file.sizeBytes),
+          ...(payload.modelUrl?.trim() ? { modelUrl: payload.modelUrl.trim() } : {}),
+          attachments,
+          material: payload.material,
+          color: payload.color,
+          layerHeight: payload.layerHeight || "Not specified",
+          infill: payload.infill ?? null,
+          purpose: payload.purpose || "Not specified",
+          notes: payload.notes || "",
+          submittedAt,
+          status: "SUBMITTED",
+          initialApproval: null,
+          printAuthorization: null,
+          assignedStaffId: null,
+          assignedStaff: null,
+          pickupLocation: null,
+          completedAt: null,
+          history: [{ type: "SUBMITTED", at: submittedAt, by: currentUser().name }],
+        };
+        state.jobs.unshift(job);
+        return job;
+      });
+    } catch (error) {
+      await modelFilesStore.remove(attachments.map(file => file.id)).catch(() => {});
+      throw error;
+    }
   },
   async claimJob(jobId) {
     requireStaff();

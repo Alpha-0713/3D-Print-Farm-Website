@@ -1,0 +1,127 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v2.3 regression checks</title><style>body{font:14px/1.6 system-ui;background:#161616;color:#eee;margin:20px}button{padding:10px;cursor:pointer}pre{white-space:pre-wrap}iframe{width:100%;height:900px;border:1px solid #555;display:block}</style><h1>v2.3 regression checks</h1><p>Uses synthetic models, backs up browser demo records, and removes only files created by this run. No network upload or real printer action.</p><button id="run">Run v2.3 checks</button><button id="show">Show sample model job</button><pre id="result">Ready.</pre><iframe id="app-frame" title="Production app under test"></iframe><script type="module">
+import { jobsService, LOCAL_DATA_KEYS } from '../src/services.js?v=2.2&rev=5';
+import { authService } from '../src/authService.js?v=2.2&rev=5';
+import { modelFilesStore, jobAttachments } from '../src/modelFilesStore.js?v=2.3';
+const frame=document.querySelector('iframe'),result=document.querySelector('#result'),key='three-d-print-farm-demo-v3',passed=[];
+let savedIds=[],backup=null,jobId='';
+const doc=()=>frame.contentDocument, win=()=>frame.contentWindow;
+const check=(ok,label)=>{if(!ok)throw new Error(label);passed.push('PASS · '+label);result.textContent=passed.join('\n');};
+const wait=async(fn,label)=>{const until=Date.now()+25000;while(Date.now()<until){if(fn())return;await new Promise(r=>setTimeout(r,40));}throw new Error('Timed out: '+label+' · '+(doc()?.querySelector('.model-preview-message')?.textContent||''));};
+const settle=()=>new Promise(r=>setTimeout(r,330));
+const route=async(hash,selector)=>{win().location.hash=hash;await wait(()=>doc()?.querySelector(selector)&&(!hash.startsWith('#/staff/jobs/')||doc().querySelector('.job-model-files')?.dataset.jobId===hash.split('/').pop()),'route '+hash);};
+const digest=async file=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer()))).join(',');
+async function setup(){
+ backup=Object.fromEntries(LOCAL_DATA_KEYS.map(k=>[k,localStorage.getItem(k)]));
+ sessionStorage.setItem('printfarm-v23-qa-backup',JSON.stringify(backup));
+ localStorage.setItem(key,JSON.stringify({jobs:[],notifications:[],inventory:[{id:'v23-gray',material:'PLA',color:'Demo gray',hexColor:'#808080',available:true,lowStock:false}],contributions:[],hours:{transactions:[],requests:[]}}));
+ authService.switchRole('demo-person-01');
+ const files=await Promise.all(['stl','obj','3mf'].map(async extension=>new File([await(await fetch('./fixtures/test-part.'+extension)).arrayBuffer()],'Demo original.'+extension)));
+ const job=await jobsService.createJob({projectName:'Demo model inspection',file:{name:files[0].name,sizeBytes:files[0].size},modelFiles:files,inventoryId:'v23-gray',material:'PLA',color:'Demo gray'});
+ savedIds=job.attachments.map(file=>file.id);jobId=job.id;
+ authService.switchRole('demo-person-04');await jobsService.reviewRequest(job.id,'approved');
+ authService.switchRole('demo-person-02');await jobsService.claimJob(job.id);
+ frame.src='../index.html#/staff/jobs/'+jobId;
+ await wait(()=>doc()?.querySelector('.job-model-files'),'job details');
+ return {files,job};
+}
+async function cleanup(){frame.src='about:blank';await modelFilesStore.remove(savedIds);for(const[k,v]of Object.entries(backup||{})){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}sessionStorage.removeItem('printfarm-v23-qa-backup');}
+document.querySelector('#show').onclick=async()=>{try{if(!backup)await setup();else frame.src='../index.html#/staff/jobs/'+jobId;result.textContent='Synthetic model job ready. Reload and download from the frame; use Run checks to restore previous records.';}catch(e){result.textContent='FAIL · '+e.message;}};
+document.querySelector('#run').onclick=async()=>{
+ const button=document.querySelector('#run');button.disabled=true;passed.length=0;
+ try{
+ if(backup){await cleanup();backup=null;}
+ const {files,job}=await setup();
+ check(job.attachments.length===3,'Multiple originals are saved as separate attachments');
+ for(let i=0;i<files.length;i++)check(await digest(files[i])===await digest(await modelFilesStore.get(savedIds[i])),'Original '+files[i].name+' is byte-for-byte identical after IndexedDB read');
+
+ const beforeFailure=JSON.parse(localStorage.getItem(key)).jobs.length;
+ const nativeAdd=IDBObjectStore.prototype.add;
+ IDBObjectStore.prototype.add=function(){throw new DOMException('Synthetic storage limit','QuotaExceededError');};
+ let storageRejected=false;
+ try{await jobsService.createJob({projectName:'Storage failure demo',file:{name:files[0].name,sizeBytes:files[0].size},modelFiles:[files[0]],material:'PLA',color:'Demo gray',inventoryId:'v23-gray'});}catch{storageRejected=true;}finally{IDBObjectStore.prototype.add=nativeAdd;}
+ check(storageRejected&&JSON.parse(localStorage.getItem(key)).jobs.length===beforeFailure,'Unavailable file storage rejects submission without creating a partial job');
+ await wait(()=>doc().querySelector('.job-model-preview canvas'),'STL viewer');await wait(()=>!doc().querySelector('[data-action="reset-job-camera"]').disabled,'STL ready');check(true,'STL preview loads in real job details');
+ for(const[index,extension]of [[1,'OBJ'],[2,'3MF']]){
+ doc().querySelector('[data-action="preview-job-file"][data-index="'+index+'"]').click();await wait(()=>doc().querySelector('[data-preview-name]').textContent.endsWith(extension.toLowerCase()),extension+' selected');await wait(()=>!doc().querySelector('[data-action="reset-job-camera"]').disabled,extension+' ready');check(true,extension+' preview loads with the existing viewer');
+ }
+ doc().querySelector('[data-action="reset-job-camera"]').click();check(true,'Reset view remains available after changing files');
+ const downloads=[];const nativeClick=win().HTMLAnchorElement.prototype.click;
+ win().HTMLAnchorElement.prototype.click=function(){if(this.download)downloads.push({name:this.download,href:this.href});else nativeClick.call(this);};
+ for(let i=0;i<files.length;i++){
+  doc().querySelector('[data-action="download-job-file"][data-index="'+i+'"]').click();await wait(()=>downloads.length===i+1,'download '+i);
+  const fetched=await(await fetch(downloads[i].href)).blob();check(downloads[i].name===files[i].name&&await digest(fetched)===await digest(files[i]),'Download preserves original filename and exact '+files[i].name+' bytes');
+ }
+ win().HTMLAnchorElement.prototype.click=nativeClick;
+ const sidebar=doc().querySelector('.staff-sidebar'), shell=doc().querySelector('.staff-app');
+ if(shell.dataset.sidebarCollapsed==='true'){doc().querySelector('[data-action="toggle-sidebar"]').click();await settle();}
+ const centers=[...doc().querySelectorAll('.sidebar-link svg')].map(icon=>icon.getBoundingClientRect().y);
+ doc().querySelector('[data-action="toggle-sidebar"]').click();await settle();
+ check(shell.dataset.sidebarCollapsed==='true'&&doc().querySelector('[data-action="toggle-sidebar"]').getAttribute('aria-expanded')==='false','Click collapses sidebar and updates its accessible state');
+ check([...doc().querySelectorAll('.sidebar-link svg')].every((icon,i)=>Math.abs(icon.getBoundingClientRect().y-centers[i])<.5),'Collapsing preserves navigation icon vertical positions');
+ check(sidebar.getBoundingClientRect().x===0&&sidebar.getBoundingClientRect().y===0,'Sidebar remains flush with top and left page edges');
+ const compactWidth=sidebar.getBoundingClientRect().width;
+ sidebar.dispatchEvent(new (win().MouseEvent)('mouseenter',{bubbles:true}));sidebar.dispatchEvent(new (win().MouseEvent)('mouseover',{bubbles:true}));await settle();
+ check(shell.dataset.sidebarCollapsed==='true'&&Math.abs(sidebar.getBoundingClientRect().width-compactWidth)<.5,'Hover never expands or floats the sidebar');
+ for(const[hash,selector]of [['#/staff/active','.active-job-card'],['#/staff/materials','.materials-inventory'],['#/staff/hours','.hours-request-form'],['#/staff','.overview-job-table'],['#/staff/jobs/'+job.id,'.job-model-files']]){
+ await route(hash,selector);check(doc().querySelector('.staff-sidebar')===sidebar&&doc().querySelector('.staff-app').dataset.sidebarCollapsed==='true','Retains compact sidebar while navigating to '+hash);
+ }
+ for(let i=0;i<12;i++)doc().querySelector('[data-action="toggle-sidebar"]').click();await settle();check(doc().querySelector('.staff-app').dataset.sidebarCollapsed==='true','Twelve rapid toggles settle consistently');
+ const refreshed=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));win().location.reload();await refreshed;
+ await wait(()=>doc()?.querySelector('.job-model-files'),'reloaded files');await wait(()=>!doc().querySelector('[data-action="reset-job-camera"]').disabled,'reloaded preview');
+ check(doc().querySelector('.staff-app').dataset.sidebarCollapsed==='true','Sidebar selection survives page reload');check(!doc().querySelector('[data-action="download-job-file"]').disabled,'Original model remains available after reload');
+ await route('#/staff','.overview-job-table');
+ for(const theme of ['dark','light']){
+ doc().documentElement.dataset.theme=theme;await settle();
+ const row=doc().querySelector('.overview-job-table tbody tr'),panel=row.closest('.staff-section');check(win().getComputedStyle(row).backgroundColor===win().getComputedStyle(panel).backgroundColor,'Job row matches panel surface in '+theme+' mode');
+ await route('#/staff/active','.active-job-card');const card=doc().querySelector('.active-job-card');check(win().getComputedStyle(card).backgroundColor===win().getComputedStyle(doc().documentElement).getPropertyValue('--surface-main').trim()||win().getComputedStyle(card).backgroundColor===win().getComputedStyle(doc().body).backgroundColor,'Active job card uses shared surface in '+theme+' mode');await route('#/staff','.overview-job-table');
+ }
+ const stored=JSON.parse(localStorage.getItem(key));const current=stored.jobs[0];
+ const corrupt=(await modelFilesStore.save([new File(['broken geometry'],'Broken.stl')]))[0];savedIds.push(corrupt.id);
+ stored.jobs.push({...current,id:'v23-corrupt',projectName:'Corrupt model demo',attachments:[corrupt]},{...current,id:'v23-missing',projectName:'Missing model demo',attachments:[{id:'does-not-exist',name:'Missing.obj'}]},{...current,id:'v23-legacy',projectName:'Legacy filename demo',attachments:[]},{...current,id:'v23-empty',projectName:'No files demo',fileName:'',attachments:[]});
+ // Unsupported legacy originals can still be downloaded even if no loader is available.
+ const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('three-d-print-farm-model-files',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+ const unsupported={id:crypto.randomUUID(),name:'Original.step',sizeBytes:4,type:'',blob:new Blob(['STEP'])};savedIds.push(unsupported.id);
+ await new Promise((resolve,reject)=>{const tx=db.transaction('originals','readwrite');tx.objectStore('originals').add(unsupported);tx.oncomplete=resolve;tx.onerror=reject;});db.close();
+ stored.jobs.push({...current,id:'v23-unsupported',projectName:'Unsupported file demo',attachments:[{id:unsupported.id,name:unsupported.name,sizeBytes:4}]});localStorage.setItem(key,JSON.stringify(stored));
+ await route('#/staff/jobs/v23-corrupt','.job-model-files');await wait(()=>doc().querySelector('[data-file-status]')?.textContent.includes('could not be previewed'),'corrupt error');check(!doc().querySelector('[data-action="download-job-file"]').disabled,'Corrupt geometry reports an error but preserves the original download');
+ await route('#/staff/jobs/v23-missing','.job-model-files');await wait(()=>doc().querySelector('[data-file-status]')?.textContent.includes('unavailable'),'missing file');check(doc().querySelector('[data-action="download-job-file"]').disabled,'Missing originals cannot trigger a fabricated download');
+ await route('#/staff/jobs/v23-legacy','.job-model-files');check(doc().querySelector('[data-file-status]').textContent.includes('filename only'),'Legacy filename-only record is explained clearly');
+ await route('#/staff/jobs/v23-empty','.job-model-files');check(doc().querySelector('.job-file-empty').textContent.includes('No model files'),'Jobs without files render a clean empty state');
+ await route('#/staff/jobs/v23-unsupported','.job-model-files');await wait(()=>!doc().querySelector('[data-action="download-job-file"]').disabled,'unsupported original');check(doc().querySelector('[data-action="preview-job-file"]').disabled&&doc().querySelector('[data-file-status]').textContent.includes('unsupported'),'Unsupported format allows original download and disables preview');
+
+ authService.switchRole('demo-person-03');win().location.reload();await wait(()=>doc()?.querySelector('.staff-app')?.dataset.identityId==='demo-person-03','senior identity');
+ for(const[hash,selector]of [['#/staff/materials/new','[data-form="inventory-add"]'],['#/staff/materials/v23-gray','[data-form="inventory-update"]']]){await route(hash,selector);check(doc().querySelector('.staff-app').dataset.sidebarCollapsed==='true','Compact sidebar also persists on '+hash);}
+ authService.switchRole('demo-person-04');win().location.reload();await wait(()=>doc()?.querySelector('.staff-app')?.dataset.identityId==='demo-person-04','supervisor identity');
+ await route('#/staff/hours/staff/demo-person-02','.hours-staff-detail');check(doc().querySelector('.staff-app').dataset.sidebarCollapsed==='true','Compact sidebar persists on supervisor staff-hours details');
+ await route('#/staff/jobs/v23-unsupported','.job-model-files');
+ for(const width of [1440,1024,768,390,320]){
+ frame.style.width=width+'px';await settle();
+ for(const collapsed of [false,true]){if((doc().querySelector('.staff-app').dataset.sidebarCollapsed==='true')!==collapsed)doc().querySelector('[data-action="toggle-sidebar"]').click();await settle();check(doc().documentElement.scrollWidth<=width+1,'No document overflow at '+width+'px with '+(collapsed?'compact':'expanded')+' navigation');}
+ }
+
+ // Preserve the latest main-branch MakerWorld preview and link-only submission.
+ await route('#/get-started','#model-link-url');
+ const actualFetch=win().fetch.bind(win());
+ win().fetch=(resource,options)=>{
+  const url=String(resource);
+  if(url.startsWith('https://api.bambulab.com/')||url.startsWith('https://makerworld.com/api/')||url.startsWith('https://api.microlink.io/'))return Promise.resolve(new (win().Response)(JSON.stringify({title:'Synthetic MakerWorld fixture',designCreator:{name:'Demo creator'}}),{status:200,headers:{'content-type':'application/json'}}));
+  return actualFetch(resource,options);
+ };
+ const modelUrl='https://makerworld.com/en/models/12345-synthetic-fixture';
+ const linkInput=doc().querySelector('#model-link-url');linkInput.value=modelUrl;linkInput.dispatchEvent(new (win().Event)('input',{bubbles:true}));
+ await wait(()=>doc().querySelector('.makerworld-card')?.textContent.includes('Synthetic MakerWorld fixture'),'MakerWorld card');check(true,'Preserves MakerWorld preview cards with mocked model metadata');
+ doc().querySelector('[data-action="wizard-next"]').click();await wait(()=>doc().querySelector('.filament-palette'),'link print settings');
+ const choice=doc().querySelector('input[name="inventoryId"]');choice.checked=true;choice.dispatchEvent(new (win().Event)('change',{bubbles:true}));
+ doc().querySelector('[data-action="wizard-next"]').click();await wait(()=>doc().querySelector('[data-field="projectName"]'),'link project details');
+ const name=doc().querySelector('[data-field="projectName"]');name.value='Synthetic model-link request';name.dispatchEvent(new (win().Event)('input',{bubbles:true}));
+ doc().querySelector('[data-action="wizard-next"]').click();await wait(()=>doc().querySelector('[data-action="submit-request"]'),'link review');
+ doc().querySelector('[data-action="submit-request"]').click();await wait(()=>JSON.parse(localStorage.getItem(key)).jobs.some(item=>item.projectName==='Synthetic model-link request'),'link submission');
+ const linked=JSON.parse(localStorage.getItem(key)).jobs.find(item=>item.projectName==='Synthetic model-link request');
+ check(linked.modelUrl===modelUrl&&linked.attachments.length===0,'Link-only wizard submission preserves the URL without inventing an original file');
+ await jobsService.reviewRequest(linked.id,'approved');await route('#/staff/jobs/'+linked.id,'.job-model-files');
+ check(doc().querySelector('.staff-content').textContent.includes(modelUrl)&&doc().querySelector('.job-file-empty').textContent.includes('model link')&&!doc().querySelector('[data-action="download-job-file"]'),'Staff details preserve the model link and explain the absence of original bytes');
+ result.textContent=passed.length+' v2.3 checks passed\n'+passed.join('\n');
+ }catch(e){result.textContent=passed.join('\n')+'\nFAIL · '+e.message;console.error(e);}
+ finally{await cleanup();backup=null;button.disabled=false;frame.style.width='100%';}
+};
+</script></html>

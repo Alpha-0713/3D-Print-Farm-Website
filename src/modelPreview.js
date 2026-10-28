@@ -145,7 +145,7 @@ class ModelPreview {
       if (!this.file?.size || this.file.size > 25 * 1024 * 1024) {
         throw new Error("The model file is empty or exceeds the 25 MB limit.");
       }
-      const name = String(this.file.name || "").trim().split(/[?#]/, 1)[0];
+      const name = String(this.file.name || "").trim();
       const extension = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
       const buffer = await this.file.arrayBuffer();
       let object;
@@ -210,6 +210,7 @@ class ModelPreview {
     fillLight.position.set(-4, -2, -3);
     this.scene.add(fillLight);
     this.scene.add(object);
+    this.sphere = sphere;
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
@@ -217,6 +218,7 @@ class ModelPreview {
     this.controls.maxDistance = sphere.radius * 45;
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+    this.resetCamera();
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(this.container);
@@ -227,6 +229,17 @@ class ModelPreview {
       this.renderer.render(this.scene, this.camera);
     };
     animate();
+  }
+
+  resetCamera() {
+    if (!this.camera || !this.controls || !this.sphere) return;
+    const vertical = THREE.MathUtils.degToRad(this.camera.fov / 2);
+    const horizontal = Math.atan(Math.tan(vertical) * this.camera.aspect);
+    const distance = this.sphere.radius / Math.sin(Math.min(vertical, horizontal)) * 1.15;
+    this.camera.position.copy(new THREE.Vector3(.85, .72, 1).normalize().multiplyScalar(distance));
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+    this.controls.saveState();
   }
 
   syncAppearance() {
@@ -284,3 +297,5 @@ export async function mountModelPreview(container, file, onState) {
   activePreview = preview;
   await preview.load();
 }
+
+export function resetModelPreview() { activePreview?.resetCamera(); }

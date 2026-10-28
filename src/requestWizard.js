@@ -56,7 +56,7 @@ function makerWorldCard(preview) {
 function fileSummary(state) {
   const file = state.wizard.file;
   if (!file && state.wizard.makerWorldPreview) return makerWorldCard(state.wizard.makerWorldPreview);
-  if (!file && state.wizard.linkUrl.trim()) return `<div class="selected-file">\
+  if (!file && String(state.wizard.linkUrl || "").trim()) return `<div class="selected-file">\
   <div class="file-thumb"><strong aria-hidden="true">↗</strong></div>\
   <div class="file-info"><strong>Model link provided</strong><span>No preview; the link will be included with your request.</span></div>\
 </div>`;
@@ -153,7 +153,7 @@ function wizardPanel(state, filaments) {
   </div>\
 </div>\
 <input id="model-file" class="sr-only" type="file" accept=".stl,.3mf,.obj,model/stl,model/obj,model/3mf,application/vnd.ms-package.3dmanufacturing-3dmodel+xml" aria-label="Choose a 3D model file" />\
-<div class="file-drop ${w.file || w.linkUrl.trim() ? "has-file" : ""}" data-drop-zone="true">\
+<div class="file-drop ${w.file || String(w.linkUrl || "").trim() ? "has-file" : ""}" data-drop-zone="true">\
   ${fileSummary(state)}\
 </div>\
 <p class="form-feedback" id="file-feedback" role="status" aria-live="polite">\
@@ -170,7 +170,7 @@ function wizardPanel(state, filaments) {
     ⓘ\
   </span>\
   <p>\
-    Files are previewed locally in this browser. The demo stores the file name and size; it does not upload file contents. Model links are passed along with your request.\
+    The model is previewed locally. On submission, the original file is saved in this browser for staff preview and download. It is never uploaded. Model links are included with your request.\
   </p>\
 </div>`
     : w.step === 2 ? `<div class="form-section-head">\
@@ -321,13 +321,13 @@ ${reviewCard(w)}\
          ${w.makerWorldPreview ? "MAKERWORLD PREVIEW" : "3D MODEL PREVIEW"}\
       </span>\
       <div class="preview-art ${w.makerWorldPreview ? "makerworld-preview-art" : "model-preview"}" id="model-preview" role="group" aria-label="${w.makerWorldPreview ? "MakerWorld model preview" : "Interactive 3D model preview"}">\
-        ${w.makerWorldPreview?.image ? `<img class="makerworld-preview-image" src="${esc(w.makerWorldPreview.image)}" alt="${esc(w.makerWorldPreview.title)}" loading="lazy" />` : `<p class="model-preview-message" role="status" aria-live="polite">${w.makerWorldPreviewStatus === "loading" ? "Loading MakerWorld preview…" : w.makerWorldPreviewStatus === "unavailable" ? "MakerWorld preview details are unavailable." : w.makerWorldPreviewStatus === "details" ? "Model details found; thumbnail unavailable." : w.linkUrl.trim() ? "MakerWorld previews are available for MakerWorld model links." : w.file ? "Loading model geometry…" : "Choose a file or paste a MakerWorld link."}</p>`}\
+        ${w.makerWorldPreview?.image ? `<img class="makerworld-preview-image" src="${esc(w.makerWorldPreview.image)}" alt="${esc(w.makerWorldPreview.title)}" loading="lazy" />` : `<p class="model-preview-message" role="status" aria-live="polite">${w.makerWorldPreviewStatus === "loading" ? "Loading MakerWorld preview…" : w.makerWorldPreviewStatus === "unavailable" ? "MakerWorld preview details are unavailable." : w.makerWorldPreviewStatus === "details" ? "Model details found; thumbnail unavailable." : String(w.linkUrl || "").trim() ? "MakerWorld previews are available for MakerWorld model links." : w.file ? "Loading model geometry…" : "Choose a file or paste a MakerWorld link."}</p>`}\
       </div>\
       <h2>\
         ${esc(w.makerWorldPreview?.title || w.projectName || "Your project")}\
       </h2>\
       <p>\
-        ${w.makerWorldPreview ? `${esc(w.makerWorldPreview.creator)} · ↓ ${makerWorldCount(w.makerWorldPreview.downloads)} · ♡ ${makerWorldCount(w.makerWorldPreview.likes)}` : w.file ? `${esc(w.file.name)} · ${formatBytes(w.file.sizeBytes)}` : w.linkUrl.trim() ? "MakerWorld model link" : "No model selected"}\
+        ${w.makerWorldPreview ? `${esc(w.makerWorldPreview.creator)} · ↓ ${makerWorldCount(w.makerWorldPreview.downloads)} · ♡ ${makerWorldCount(w.makerWorldPreview.likes)}` : w.file ? `${esc(w.file.name)} · ${formatBytes(w.file.sizeBytes)}` : String(w.linkUrl || "").trim() ? "MakerWorld model link" : "No model selected"}\
       </p>\
       <div class="summary-rows">\
         <div>\
@@ -377,7 +377,7 @@ ${reviewCard(w)}\
 }
 
 function reviewCard(w) {
-  const model = w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : w.linkUrl.trim() || "Choose a file or paste a model link";
+  const model = w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : String(w.linkUrl || "").trim() || "Choose a file or paste a model link";
   const rows = [["Model", model], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", normalizeOptionalNote(w.notes) || "None"]];
   return `<div class="review-card">\
   ${rows.map(([label, value], i) => `<div class="review-row ${i > 4 ? "review-detail" : ""}">\

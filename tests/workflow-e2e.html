@@ -1,9 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Full workflow checks · v2.2</title><style>body{font:14px/1.6 system-ui;background:#181818;color:#eee;margin:20px}button{padding:10px 16px;cursor:pointer}pre{white-space:pre-wrap}iframe{width:100%;height:760px;border:1px solid #555}</style></head><body><h1>Full workflow checks · v2.2 Beta</h1><p>Uses the production app in the frame, with a synthetic model-file selection and test-only confirmation answers. Prior browser data is backed up and restored after the run. No email is sent.</p><button id="run" disabled>Run full workflow</button><pre id="result" role="status">Ready.</pre><iframe title="Production app under test" id="app-frame"></iframe><script>window.addEventListener("error",event=>{document.querySelector("#result").textContent="FAIL · "+event.message;});</script><script type="module">
+import { modelFilesStore } from '../src/modelFilesStore.js?v=2.3';
 import { LOCAL_DATA_KEYS, jobsService } from '../src/services.js?v=2.2&rev=5';
 const frame=document.querySelector('iframe'), result=document.querySelector('#result'), run=document.querySelector('#run');
 const key='three-d-print-farm-demo-v3';const read=()=>JSON.parse(localStorage.getItem(key));
 run.onclick=async()=>{
- run.disabled=true;result.textContent='Running…';const passed=[];
+ run.disabled=true;result.textContent='Running…';const passed=[];const savedModelIds=[];
  const backup=Object.fromEntries(LOCAL_DATA_KEYS.map(k=>[k,localStorage.getItem(k)]));
  sessionStorage.setItem('printfarm-workflow-qa-backup',JSON.stringify(backup));
  let observer=null;
@@ -26,7 +27,7 @@ run.onclick=async()=>{
  const radio=find('input[type="radio"][name="inventoryId"], .filament-palette input[type="radio"]');radio.checked=true;radio.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
  action('wizard-next');await wait(()=>doc().querySelector('[data-field="projectName"]'),'project details');input('[data-field="projectName"]','QA full workflow bracket');
  action('wizard-next');await wait(()=>doc().querySelector('[data-action="submit-request"]'),'review');action('submit-request');await wait(()=>read().jobs.length===1,'request saved');
- const jobId=read().jobs[0].id;check(read().jobs[0].status==='SUBMITTED','Level 1 submission starts pending supervisor review');
+ const jobId=read().jobs[0].id;savedModelIds.push(...(read().jobs[0].attachments||[]).map(file=>file.id));check(read().jobs[0].status==='SUBMITTED','Level 1 submission starts pending supervisor review');
  await route('#/my-jobs','.request-row');check(find('.request-row').textContent.includes('QA full workflow bracket'),'My Print Jobs lists the owning submitter’s new request');
  const row=find('.request-row'),link=find('.request-row-action');check(getComputedStyle(link).justifyContent==='flex-start'&&getComputedStyle(link,'::after').position==='absolute','Card link covers the row and keeps the arrow beside View details');
  link.click();await wait(()=>doc().querySelector('.job-progress'),'own print progress');check(find('.progress-stage.is-current').textContent.includes('Supervisor review'),'Submitter progress shows the pending review');
@@ -59,7 +60,7 @@ run.onclick=async()=>{
  check(!observer.contentDocument.querySelector('.inbox-detail')&&observer.contentDocument.querySelector('.staff-app').dataset.identityId==='demo-person-02','Same-origin identity switches clear the previous user’s notification view');
  result.textContent=passed.length+' full workflow checks passed\n'+passed.join('\n');
  }catch(error){result.textContent=passed.join('\n')+'\nFAIL · '+error.message;console.error(error);}
- finally{if(observer){observer.src='about:blank';observer.remove();}frame.src='about:blank';await new Promise(resolve=>setTimeout(resolve,50));for(const[k,v]of Object.entries(backup)){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}sessionStorage.removeItem('printfarm-workflow-qa-backup');run.disabled=false;}
+ finally{await modelFilesStore.remove(savedModelIds);if(observer){observer.src='about:blank';observer.remove();}frame.src='about:blank';await new Promise(resolve=>setTimeout(resolve,50));for(const[k,v]of Object.entries(backup)){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}sessionStorage.removeItem('printfarm-workflow-qa-backup');run.disabled=false;}
 };
 document.querySelector("#run").disabled=false;
 </script></body></html>

@@ -1,3 +1,5 @@
+import { syncSidebarState, toggleSidebar, SIDEBAR_STORAGE_KEY } from "./sidebarState.js?v=2.3";
+import { disposeJobFiles, mountJobFiles, previewJobFile, downloadJobFile, resetJobCamera } from "./jobModelFiles.js?v=2.3";
 import { bindPersonalInbox, syncPersonalInbox } from "./personalInbox.js?v=2.2&rev=5";
 import { presenceService } from "./services.js?v=2.2&rev=5";
 import { commitPage } from "./pageCommit.js?v=2.2&rev=5";
@@ -387,6 +389,7 @@ function parseRoute() {
 async function render() {
   const revision = ++renderRevision;
   clearRouteMotion();
+  disposeJobFiles();
   modelPreviewModule?.disposeModelPreview();
   const route = parseRoute();
   if (route.page === "get-started" && state.wizard.linkUrl.trim() && state.wizard.makerWorldPreviewStatus === "idle") {
@@ -403,8 +406,9 @@ async function render() {
     ? PERMISSIONS.HOURS_ADMIN
     : ROUTE_PERMISSIONS[route.page];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    document.title = "Access restricted · 3D Print Farm · v2.2";
+    document.title = "Access restricted · 3D Print Farm · v2.3";
     commitPage(app, accessDeniedPage(state, requiredPermission));
+    syncSidebarState(app);
     syncSidebarSelection(app);
     syncFloatingControls(app);
     syncAppearanceControls();
@@ -416,13 +420,13 @@ async function render() {
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v2.2";
+    document.title = "Staff Portal · School 3D Print Farm — v2.3";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v2.2";
+    document.title = "Get Started · School 3D Print Farm — v2.3";
   } else if (["my-jobs", "my-job"].includes(route.page)) {
-    document.title = "My Print Jobs · School 3D Print Farm — v2.2";
+    document.title = "My Print Jobs · School 3D Print Farm — v2.3";
   } else {
-    document.title = "School 3D Print Farm Website — v2.2";
+    document.title = "School 3D Print Farm Website — v2.3";
   }
 
   let pageHtml;
@@ -451,11 +455,21 @@ async function render() {
   }
   if (revision !== renderRevision) return;
   commitPage(app, pageHtml);
+  syncSidebarState(app);
   syncSidebarSelection(app);
   syncFloatingControls(app);
   syncAppearanceControls();
   await syncPersonalInbox(app);
   prepareRouteMotion(routeChanged);
+
+  if (route.page === "job") {
+    const job = await jobsService.getJob(route.id);
+    if (revision !== renderRevision) return;
+    if (job) await mountJobFiles(app, job, async () => {
+      modelPreviewModule ||= await import("./modelPreview.js?v=2.2&rev=5");
+      return modelPreviewModule;
+    });
+  }
 
   if (route.page === "get-started" && state.wizard.modelFile && !state.wizard.submittedJob) {
     const selectedFile = state.wizard.modelFile;
@@ -696,7 +710,16 @@ async function doAction(action, target) {
   }
 
   try {
-    if (action === "reset-local-data") {
+    if (action === "toggle-sidebar") {
+      toggleSidebar(app);
+      return;
+    } else if (["preview-job-file", "download-job-file", "reset-job-camera"].includes(action)) {
+      if (!authService.can(PERMISSIONS.JOBS_MANAGE) || !await jobsService.getJob(id)) throw new Error("This job is no longer available to this demo identity.");
+      if (action === "preview-job-file") await previewJobFile(Number(target.dataset.index), id);
+      else if (action === "download-job-file") downloadJobFile(Number(target.dataset.index), id);
+      else resetJobCamera(id);
+      return;
+    } else if (action === "reset-local-data") {
       target.disabled = true;
       await resetLocalData();
       location.hash = "#/";
@@ -863,7 +886,7 @@ async function doAction(action, target) {
       try {
         const { modelFile, previewStatus, fileFeedback, linkUrl, makerWorldPreview, makerWorldPreviewStatus, ...request } = state.wizard;
         request.notes = normalizeOptionalNote(request.notes);
-        const job = await jobsService.createJob({ ...request, modelUrl: linkUrl.trim(), file: state.wizard.file });
+        const job = await jobsService.createJob({ ...request, modelUrl: linkUrl.trim(), file: state.wizard.file, modelFiles: state.wizard.modelFile ? [state.wizard.modelFile] : [] });
         state.wizard.submittedJob = job;
         state.wizard.submitting = false;
         jobsService.discardDraft();
@@ -1170,6 +1193,7 @@ window.addEventListener("hashchange", () => {
 });
 
 window.addEventListener("storage", async (event) => {
+  if (event.key === SIDEBAR_STORAGE_KEY) { syncSidebarState(app); return; }
   if (event.key === "three-d-print-farm-demo-v3" && event.newValue === null) {
     window.location.reload();
     return;

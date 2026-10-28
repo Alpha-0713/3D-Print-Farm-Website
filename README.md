@@ -1,8 +1,8 @@
-# 3D Print Farm Website — v2.2
+# 3D Print Farm Website — v2.3
 
-**Version 2.2** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, filament availability, and print farm equipment.
+**Version 2.3** · A responsive, frontend-only demonstration of the school's print request workflow, role-based access controls, staff hours management, filament availability, and print farm equipment.
 
-![version](https://img.shields.io/badge/version-v2.2-blue)
+![version](https://img.shields.io/badge/version-v2.3-blue)
 ![release](https://img.shields.io/badge/status-beta-orange)
 ![stack](https://img.shields.io/badge/stack-vanilla%20JavaScript-f7df1e?logo=javascript&logoColor=black)
 ![storage](https://img.shields.io/badge/storage-browser%20localStorage-lightgrey)
@@ -10,6 +10,15 @@
 > **Beta prototype:** The identities and access controls are for demonstration only. Do not use this application with real student information, production requests, secured staff work, or authoritative hour or inventory records.
 
 ## Release summary
+
+v2.3 adds a click-controlled collapsible sidebar across the Staff Dashboard. The sidebar remains flush with the top and left page edges, retains the same navigation icons and glass highlight, and never expands or floats on hover. The compact choice persists between pages, identities, and reloads. On phones the existing two-column navigation keeps its layout and shows icons when collapsed. Width transitions use 280ms, respect reduced motion, and retain fixed navigation row centers.
+
+Job details now reuse the existing interactive Three.js viewer for original STL, OBJ, and 3MF files. Select a file to rotate, pan, zoom, or reset the view. Each original can be downloaded individually with its exact bytes, name, and extension. New submissions retain the actual file locally in the `three-d-print-farm-model-files` IndexedDB database; job metadata retains attachment IDs in the existing localStorage record. Original files are never uploaded. Existing MakerWorld preview cards and model-link submissions are preserved; link-only requests have no original file bytes to download. Multiple attachments are supported by the service and details view; the existing public wizard continues to select one model per request.
+
+Existing seeded and older jobs only contain filenames, so their details explicitly report that the original is unavailable and disable preview/download. Missing and unsupported files receive clear messages; an invalid model can still be downloaded unchanged. If browser file storage is unavailable or full, submission fails with an explanation instead of silently saving a request without its original. Files are local to the current browser and origin, may be removed by browser data clearing or eviction, and are not shared across devices. Reset Local Data clears this file store and the saved sidebar choice as well as the existing demo records.
+
+Recent Jobs table rows and My Active Jobs cards use the existing `--surface-main` token in both themes, while existing separators and hover states remain intact. The version directory stays v2.3, and no backend, printer control, real email, or production authentication is added.
+
 
 v2.2 Beta retains the existing vanilla JavaScript app, design, identities, storage key, materials, hours, and equipment pages. Print requests now require **two explicit Level 4 decisions**: approval before staff can see or claim the request, and authorization after preparation before printing starts. The shared service validates both gates, assignment, current state, and repeat decisions. Staff and submitters use the same recorded-event Print Progress; the redundant Job History section has been removed while its saved events remain available.
 
@@ -33,7 +42,7 @@ The Glass Transparency setting now controls the shared fills throughout the inte
 
 Print settings use a clickable **filament colour palette**, with separate sections for each material type. Within a material, neutral colours sort from light to dark, followed by warm-to-cool colour groups. All saved filaments are listed: unavailable and unverified colours are disabled, and available Low Stock entries remain selectable. One native radio group spans every material, supporting keyboard selection and a clear selection ring. Selecting a swatch updates the chosen material, colour, HEX/RGB detail, and request summary in place without resetting scroll, focus, or the model preview. Existing saved filament IDs and legacy material/colour draft selections remain compatible. No replacement colour is silently chosen if a selection becomes unavailable, and availability is checked again before advancing and saving.
 
-**Reset Local Data**, at the bottom of public and staff pages, immediately removes the seven explicit application localStorage keys: demo data, draft, custom accounts, selected identity, accent, theme, and glass transparency. It cancels pending simulated notifications and reloads the home page with the default identity, seeded jobs, empty inventory/hour records, default accent/transparency, and the device theme. The inbox and supervisor presence are reset with the shared data record. It does not clear unrelated storage or contact a backend. There is no confirmation step.
+**Reset Local Data**, at the bottom of public and staff pages, immediately removes the eight explicit application localStorage keys: demo data, draft, custom accounts, selected identity, accent, theme, glass transparency, and sidebar state, plus original model files in IndexedDB. It cancels pending simulated notifications and reloads the home page with the default identity, seeded jobs, empty inventory/hour records, default accent/transparency, and the device theme. The inbox and supervisor presence are reset with the shared data record. It does not clear unrelated storage or contact a backend. There is no confirmation step.
 
 v1.7 Beta adds an **Our Printers** section to the public homepage, immediately above the FAQ. It describes the Bambu Lab A1 mini and Bambu Lab H2S, including their build volumes, FDM technology, example projects, and material and size guidance. The farm's A1 mini jobs are single-colour only; the H2S is the only farm model available for multi-colour jobs. Printer assignment and printability remain subject to job review and available materials.
 
@@ -120,7 +129,7 @@ Legacy links to `#/staff/queue` redirect to the Staff Overview. The former stude
 
 ## Existing features
 
-The public homepage includes project information, use cases, printer information, and FAQs. Get Started collects a model file, print settings, and project details across a four-step request workflow. It accepts STL, 3MF, and OBJ files up to **25 MB** and previews models in the browser. A direct HTTPS model URL can be loaded when its host permits cross-origin access. Model bytes are used for preview and validation only; no model is uploaded.
+The public homepage includes project information, use cases, printer information, and FAQs. Get Started collects a model file, print settings, and project details across a four-step request workflow. It accepts STL, 3MF, and OBJ files up to **25 MB** and previews models in the browser. MakerWorld model links retain their preview cards; other model links are saved with the request. Original model bytes are retained locally in IndexedDB when submitting, for staff preview and download; no model is uploaded.
 
 The Staff Portal retains job review, active job assignment, job status updates, simulated pickup notifications, and filament availability management. The Materials list shows the actual color swatch, plastic type, color name, normalized HEX, and derived RGB. Level 3 and Level 4 staff can independently toggle Low Stock and Available; unavailable entries remain visible to staff, and confirmed deletion removes an entry from request choices. New entries start with Low Stock off and Available on. In the request workflow, available low-stock filaments remain selectable and display a warning; unavailable entries remain visible as disabled swatches; deleted entries are removed. The Overview’s Recent Jobs table uses project names to identify requests; file and material columns are omitted. Internal job IDs are retained only for relationships and links. Student contribution records are available to Level 4 in the combined Hours activity history. These actions update local demo data only.
 
@@ -135,7 +144,7 @@ PLA and PETG are examples of common materials, not a promise that every colour o
 
 ## Data, setup, and limitations
 
-The `v3` suffix below identifies the storage schema, not the website release; it is retained in v2.2 so existing browser data stays available. Jobs, notifications, filament entries, contribution records, hour requests, and hour transactions use the browser localStorage key `three-d-print-farm-demo-v3`. A filament entry stores its identity, HEX color, Low Stock Boolean, and Available Boolean; RGB is derived from HEX. Existing v1.5 inventory records are migrated in place: the former threshold rule becomes the Low Stock flag, and entries with zero quantity become unavailable so they are not newly offered. Quantity, threshold, adjustment, and note fields are then removed. Additional demo profiles use `three-d-print-farm-demo-accounts`; the active identity uses `three-d-print-farm-demo-role`. These records are local to this browser and origin, are not shared between users or devices, and are removed if browser data is cleared. Where supported, the app uses the browser Web Locks API to serialize same-origin writes; localStorage still cannot guarantee database-grade transactions or consistency across devices.
+The `v3` suffix below identifies the storage schema, not the website release; it is retained in v2.3 so existing browser data stays available. Jobs, notifications, filament entries, contribution records, hour requests, and hour transactions use the browser localStorage key `three-d-print-farm-demo-v3`. A filament entry stores its identity, HEX color, Low Stock Boolean, and Available Boolean; RGB is derived from HEX. Existing v1.5 inventory records are migrated in place: the former threshold rule becomes the Low Stock flag, and entries with zero quantity become unavailable so they are not newly offered. Quantity, threshold, adjustment, and note fields are then removed. Additional demo profiles use `three-d-print-farm-demo-accounts`; the active identity uses `three-d-print-farm-demo-role`. These records are local to this browser and origin, are not shared between users or devices, and are removed if browser data is cleared. Where supported, the app uses the browser Web Locks API to serialize same-origin writes; localStorage still cannot guarantee database-grade transactions or consistency across devices.
 
 The repository has no backend, database, Google authentication, email delivery, printer control, or server-side authorization. A production system must authenticate users on a server, enforce permissions for every protected operation, and store hours and audit history in a shared transactional database. A frontend role selector and client-side checks do not prove a user's identity or securely protect data.
 
@@ -254,3 +263,11 @@ This static ES-module project has no configured build, lint, or type-check pipel
 - `tests/workflow-e2e.html`: the production print wizard, model preview, review/authorization, revisions, claiming, printing, completion, collection, hours, persistence, and same-origin notifications. The fixture backs up and restores its synthetic records and uses synthetic model-file selection.
 
 See `work/ui-refinement/validation.md` for the current verification results and changed-file manifest. Original versions of changed existing files are preserved in `work/ui-refinement/originals/`. No commit, push, merge, or tag was created.
+
+## v2.3 validation
+
+Run `node --test tests/*.test.mjs` and `node --check` for all production JavaScript. This static ES-module app has no configured build, lint, or type-check pipeline.
+
+Serve the existing directory locally and open `tests/v23-regression.html` on a dedicated QA origin. Its **Run v2.3 checks** button exercises the real job viewer for STL/OBJ/3MF, byte-for-byte original storage and download, multiple files, reload persistence, storage failure, missing/unsupported/corrupt originals, sidebar navigation and rapid toggles, both surface themes, and 1440/1024/768/390/320px layouts. It backs up and restores demo records and removes its own model files. **Show sample model job** leaves a clearly synthetic job available for manual rotation, zoom, reset, and download review; run the checks afterward to restore the previous records. Synthetic OBJ and 3MF fixtures join the existing STL fixture in `tests/fixtures/`.
+
+The existing full workflow, sidebar, inbox, and UI refinement browser fixtures remain available. Full workflow checks now clean up their newly retained model files in addition to restoring demo records. Do not commit or publish this version without explicit user approval.

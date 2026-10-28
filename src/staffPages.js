@@ -1,3 +1,5 @@
+import { sidebarCollapsed } from "./sidebarState.js?v=2.3";
+import { jobModelFiles } from "./jobModelFiles.js?v=2.3";
 import { claimable, isAssignedTo } from "./jobWorkflow.js?v=2.2&rev=5";
 import { MATERIALS } from "./data.js?v=2.2&rev=5";
 import { contributionsService, inventoryService, jobsService } from "./services.js?v=2.2&rev=5";
@@ -18,20 +20,21 @@ export function staffShell(content, active = "overview") {
     .filter(([id]) => id !== "materials" || authService.can(PERMISSIONS.FILAMENT_VIEW));
   const activeNavigation = active === "material-new" ? "materials" : active;
   const identity = authService.getCurrentIdentity();
-  return `<div class="staff-app" data-identity-id="${esc(identity.id)}" data-role-id="${esc(identity.roleId)}">\
-  <aside class="staff-sidebar">\
+  return `<div class="staff-app" data-identity-id="${esc(identity.id)}" data-role-id="${esc(identity.roleId)}" data-sidebar-collapsed="${sidebarCollapsed()}">\
+  <aside class="staff-sidebar" id="staff-sidebar">\
     <div class="sidebar-brand">\
       <div class="sidebar-brand-main">${logo()}</div>\
+      <button type="button" class="sidebar-toggle" data-action="toggle-sidebar" aria-controls="staff-sidebar" aria-expanded="${!sidebarCollapsed()}" aria-label="${sidebarCollapsed() ? "Expand" : "Collapse"} sidebar" title="${sidebarCollapsed() ? "Expand" : "Collapse"} sidebar"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="3"/><path d="M7 3v14m6-10-3 3 3 3"/></svg></button>\
     </div>\
     <nav aria-label="Staff navigation">\
       <span class="sidebar-selection" aria-hidden="true"></span>\
-  ${links.map(([id, label, href]) => `<a class="sidebar-link ${activeNavigation === id ? "selected" : ""}" href="${href}" ${activeNavigation === id ? 'aria-current="page"' : ""}>\
+  ${links.map(([id, label, href]) => `<a class="sidebar-link ${activeNavigation === id ? "selected" : ""}" href="${href}" ${activeNavigation === id ? 'aria-current="page"' : ""} aria-label="${label}" title="${label}">\
   <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[id]}</svg></span>\
   <span class="sidebar-label">${label}</span>\
 </a>`).join("")}\
     </nav>\
     <div class="sidebar-bottom">\
-      <a class="back-public" href="#/">\
+      <a class="back-public" href="#/" aria-label="Back to public website" title="Back to public website">\
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10H2m7-7-7 7 7 7"/></svg><span>Back to public website</span>\
       </a>\
     </div>\
@@ -399,7 +402,7 @@ export async function jobDetailsPage(jobId) {
             ${esc(job.fileName)}\
           </strong>\
           <small>\
-            ${job.modelUrl ? "Link included with request" : `${esc(job.fileSize)} · Filename only in this demo`}\
+            ${job.modelUrl ? "Link included with request" : `${esc(job.fileSize)} · ${job.attachments?.length ? "Model attachment · local demo" : "Original file unavailable"}`}\
           </small>\
         </div>\
         <span class="material-chip">\
@@ -432,6 +435,7 @@ export async function jobDetailsPage(jobId) {
         <button type="submit" class="button button-outline button-small">Save pickup details</button>
       </form></details>` : ""}\
     </section>\
+    ${jobModelFiles(job)}\
     ${reassignForm}\
     ${notificationRows}\
   </div>\
@@ -446,5 +450,5 @@ export async function jobDetailsPage(jobId) {
       </p>\
     </div>\
   </aside>\
-</div>`, "overview");
+</div>`, isAssignedTo(job, authService.getCurrentIdentity()) ? "active" : "overview");
 }
