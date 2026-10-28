@@ -268,6 +268,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .model-link-divider { display: flex; align-items: center; gap: 10px; margin: 11px 0; color: var(--quiet); font-size: var(--text-caption); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-label); }
 .model-link-divider::before, .model-link-divider::after { content: ""; height: 1px; flex: 1; background: var(--surface-hover); }
 .model-link-field small { line-height: var(--line-body); }
+.makerworld-card { display: block; width: min(100%, 480px); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-control); background: #1b1b1b; color: #f7f7f7; text-decoration: none; }
+.makerworld-card > img, .makerworld-card-placeholder { display: block; width: 100%; aspect-ratio: 1.4; object-fit: cover; }
+.makerworld-card-placeholder { display: grid; place-items: center; background: var(--surface-hover); color: var(--muted); font-size: var(--text-stat); }
+.makerworld-card-details { padding: 9px 11px 10px; }
+.makerworld-card-details > strong { display: block; overflow: hidden; font-size: var(--text-meta); text-overflow: ellipsis; white-space: nowrap; }
+.makerworld-card-meta { display: flex; align-items: center; gap: 13px; margin-top: 7px; color: #bdbdbd; font-size: var(--text-caption); }
+.makerworld-card-meta > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.makerworld-card-meta > span:first-child { min-width: 0; flex: 1; }
+.makerworld-card-meta img, .makerworld-card-meta i { width: 23px; height: 23px; border-radius: 50%; object-fit: cover; }
+.makerworld-card-meta i { display: grid; place-items: center; background: var(--surface-emphasis); color: var(--text); font-style: normal; }
+.makerworld-preview-art { display: grid; place-items: center; background: #151515; }
+.makerworld-preview-image { display: block; width: 100%; height: 100%; object-fit: cover; }
 .form-note { display: flex; gap: 9px; margin-top: 10px; color: var(--muted); }
 .form-note span { color: var(--lime); }
 .form-note p { margin: 0; font-size: var(--text-caption); }

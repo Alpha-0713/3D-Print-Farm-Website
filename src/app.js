@@ -39,6 +39,8 @@ const state = {
     previewStatus: "empty",
     fileFeedback: "",
     linkUrl: "",
+    makerWorldPreview: null,
+    makerWorldPreviewStatus: "idle",
     projectName: "",
     purpose: "Personal project",
     notes: "",
@@ -118,6 +120,8 @@ function decodeRouteId(value) {
 
 let modelPreviewModule;
 let renderRevision = 0;
+let makerWorldPreviewTimer = null;
+let makerWorldPreviewController = null;
 let lastRenderedRouteKey = "";
 let routeMotionObserver = null;
 let routeMotionCleanup = null;
@@ -207,8 +211,120 @@ if (savedDraft) {
     modelFile: null,
     previewStatus: "empty",
     fileFeedback: "",
+    makerWorldPreview: null,
+    makerWorldPreviewStatus: "idle",
     submittedJob: null,
   });
+}
+
+function makerWorldDesignId(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    if (url.hostname !== "makerworld.com" && !url.hostname.endsWith(".makerworld.com")) return "";
+    return url.pathname.match(/\/models\/(\d+)(?:[-/]|$)/i)?.[1] || "";
+  } catch {
+    return "";
+  }
+}
+
+function makerWorldFallbackTitle(value) {
+  try {
+    const slug = new URL(value).pathname.match(/\/models\/\d+[-/]?([^/]*)/i)?.[1] || "MakerWorld model";
+    return decodeURIComponent(slug).replace(/[-_]+/g, " ").trim() || "MakerWorld model";
+  } catch {
+    return "MakerWorld model";
+  }
+}
+
+function safeMakerWorldImage(value) {
+  try {
+    const imageUrl = new URL(typeof value === "string" ? value : "");
+    if (imageUrl.protocol === "https:" && (imageUrl.hostname === "makerworld.com" || imageUrl.hostname.endsWith(".makerworld.com") || imageUrl.hostname.endsWith(".bblmw.com"))) return imageUrl.href;
+  } catch { /* Ignore image URLs outside MakerWorld's image hosts. */ }
+  return "";
+}
+
+function makerWorldPreviewFrom(data, value) {
+  const design = data?.data?.design || data?.data || data?.design || data;
+  const creator = design?.designCreator || design?.creator || {};
+  const images = Array.isArray(design?.images) ? design.images : Array.isArray(design?.designPictures) ? design.designPictures : [];
+  const rawImage = design?.coverUrl || design?.cover || design?.coverImage || images[0]?.url || images[0] || "";
+  const count = (...values) => values.find((item) => item !== null && item !== undefined && item !== "" && Number.isFinite(Number(item))) ?? null;
+  return {
+    url: value,
+    title: String(design?.title || design?.name || makerWorldFallbackTitle(value)),
+    creator: String(creator?.name || design?.creatorName || creator?.handle || "MakerWorld creator"),
+    avatar: safeMakerWorldImage(creator?.avatar || creator?.avatarUrl || ""),
+    image: safeMakerWorldImage(typeof rawImage === "string" ? rawImage : rawImage?.url || ""),
+    downloads: count(design?.downloadCount, design?.downloads, design?.stats?.downloadCount),
+    likes: count(design?.likeCount, design?.likes, design?.stats?.likeCount),
+  };
+}
+
+async function fetchMakerWorldDesign(designId, signal) {
+  const endpoints = [
+    `https://api.bambulab.com/v1/design-service/design/${designId}?handle=en`,
+    `https://makerworld.com/api/v1/design-service/design/${designId}?handle=en`,
+  ];
+  let lastError;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, { method: "GET", mode: "cors", credentials: "omit", signal });
+      if (!response.ok) throw new Error(`MakerWorld returned HTTP ${response.status}.`);
+      return await response.json();
+    } catch (error) {
+      if (signal.aborted) throw error;
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("MakerWorld model details are unavailable.");
+}
+
+async function renderKeepingModelLinkFocus() {
+  const input = document.querySelector("#model-link-url");
+  const keepFocus = document.activeElement === input;
+  const start = keepFocus ? input.selectionStart : null;
+  const end = keepFocus ? input.selectionEnd : null;
+  await render();
+  if (keepFocus) {
+    const nextInput = document.querySelector("#model-link-url");
+    nextInput?.focus();
+    if (start !== null && end !== null) nextInput?.setSelectionRange(start, end);
+  }
+}
+
+function scheduleMakerWorldPreview(value) {
+  clearTimeout(makerWorldPreviewTimer);
+  makerWorldPreviewController?.abort();
+  makerWorldPreviewController = null;
+  const requestedUrl = String(value || "").trim();
+  const designId = makerWorldDesignId(requestedUrl);
+  state.wizard.makerWorldPreview = null;
+  state.wizard.makerWorldPreviewStatus = designId ? "loading" : (requestedUrl ? "unsupported" : "idle");
+  makerWorldPreviewTimer = setTimeout(async () => {
+    if (!designId) {
+      await renderKeepingModelLinkFocus();
+      return;
+    }
+    await renderKeepingModelLinkFocus();
+    if (state.wizard.linkUrl.trim() !== requestedUrl) return;
+    const controller = new AbortController();
+    makerWorldPreviewController = controller;
+    try {
+      const data = await fetchMakerWorldDesign(designId, controller.signal);
+      if (controller.signal.aborted || state.wizard.linkUrl.trim() !== requestedUrl) return;
+      state.wizard.makerWorldPreview = makerWorldPreviewFrom(data, requestedUrl);
+      state.wizard.makerWorldPreviewStatus = state.wizard.makerWorldPreview.image ? "ready" : "details";
+    } catch (error) {
+      if (controller.signal.aborted || state.wizard.linkUrl.trim() !== requestedUrl) return;
+      state.wizard.makerWorldPreview = makerWorldPreviewFrom({}, requestedUrl);
+      state.wizard.makerWorldPreviewStatus = "unavailable";
+    } finally {
+      if (makerWorldPreviewController === controller) makerWorldPreviewController = null;
+      if (!controller.signal.aborted && state.wizard.linkUrl.trim() === requestedUrl) await renderKeepingModelLinkFocus();
+    }
+  }, 650);
 }
 
 function parseRoute() {
@@ -251,6 +367,9 @@ async function render() {
   clearRouteMotion();
   modelPreviewModule?.disposeModelPreview();
   const route = parseRoute();
+  if (route.page === "get-started" && state.wizard.linkUrl.trim() && state.wizard.makerWorldPreviewStatus === "idle") {
+    scheduleMakerWorldPreview(state.wizard.linkUrl);
+  }
   const routeKey = `${route.page}:${route.id || ""}:${route.staffId || ""}`;
   const routeChanged = routeKey !== lastRenderedRouteKey;
   lastRenderedRouteKey = routeKey;
@@ -377,6 +496,10 @@ function toast(message, kind = "success") {
 async function setFile(file) {
   if (!file) return;
   state.wizard.linkUrl = "";
+  state.wizard.makerWorldPreview = null;
+  state.wizard.makerWorldPreviewStatus = "idle";
+  clearTimeout(makerWorldPreviewTimer);
+  makerWorldPreviewController?.abort();
 
   const selection = filesService.inspectSelection(file);
   if (!selection.valid) {
@@ -696,9 +819,13 @@ async function doAction(action, target) {
       state.wizard.previewStatus = "empty";
       state.wizard.fileFeedback = "";
       state.wizard.linkUrl = "";
+      state.wizard.makerWorldPreview = null;
+      state.wizard.makerWorldPreviewStatus = "idle";
+      clearTimeout(makerWorldPreviewTimer);
+      makerWorldPreviewController?.abort();
       await render();
     } else if (action === "save-draft") {
-      const { file, modelFile, previewStatus, fileFeedback, submittedJob, step, ...fields } = state.wizard;
+      const { file, modelFile, previewStatus, fileFeedback, makerWorldPreview, makerWorldPreviewStatus, submittedJob, step, ...fields } = state.wizard;
       if (jobsService.saveDraft(fields)) {
         toast("Draft saved on this device. Model links are saved; local files must be chosen again.");
       } else {
@@ -712,7 +839,7 @@ async function doAction(action, target) {
       state.wizard.submitting = true;
 
       try {
-        const { modelFile, previewStatus, fileFeedback, linkUrl, ...request } = state.wizard;
+        const { modelFile, previewStatus, fileFeedback, linkUrl, makerWorldPreview, makerWorldPreviewStatus, ...request } = state.wizard;
         request.notes = normalizeOptionalNote(request.notes);
         const job = await jobsService.createJob({ ...request, modelUrl: linkUrl.trim(), file: state.wizard.file });
         state.wizard.submittedJob = job;
@@ -733,6 +860,8 @@ async function doAction(action, target) {
         previewStatus: "empty",
         fileFeedback: "",
         linkUrl: "",
+        makerWorldPreview: null,
+        makerWorldPreviewStatus: "idle",
         projectName: "",
         purpose: "Personal project",
         notes: "",
@@ -925,7 +1054,9 @@ app.addEventListener("input", (event) => {
 
   if (target.matches("#model-link-url")) {
     state.wizard.linkUrl = target.value;
+    scheduleMakerWorldPreview(target.value);
     if (target.value.trim()) {
+      modelPreviewModule?.disposeModelPreview();
       state.wizard.file = null;
       state.wizard.modelFile = null;
       state.wizard.previewStatus = "empty";
