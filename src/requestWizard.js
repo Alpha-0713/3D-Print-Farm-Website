@@ -1,5 +1,11 @@
-import { inventoryService } from "./services.js?v=20";
-import { esc, footer, printNumber, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=25";
+import { canSelectFilament, filamentPalette, filamentSelectionDetails } from "./filamentPalette.js?v=2.2&rev=5";
+import { inventoryService } from "./services.js?v=2.2&rev=5";
+import { esc, footer, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=2.2&rev=5";
+
+export function normalizeOptionalNote(value) {
+  const note = typeof value === "string" ? value : "";
+  return note.trim() ? note : "";
+}
 
 function stepIndicator(active) {
   const steps = [[1, "Upload model"], [2, "Print settings"], [3, "Project details"], [4, "Review & submit"]];
@@ -76,9 +82,10 @@ function fileSummary(state) {
 }
 function formatBytes(bytes) { return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(2)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`; }
 
-function wizardPanel(state, availableFilaments) {
+function wizardPanel(state, filaments) {
   const w = state.wizard;
-  const selectedFilament = availableFilaments.find((item) => item.id === w.inventoryId);
+  const notes = typeof w.notes === "string" ? w.notes : "";
+  const selectedFilament = filaments.find((item) => item.id === w.inventoryId && canSelectFilament(item));
   if (w.submittedJob) return `<section class="confirmation-panel">\
   <div class="confirmation-icon">\
     ✓\
@@ -94,18 +101,18 @@ function wizardPanel(state, availableFilaments) {
   </p>\
   <div class="confirmation-id">\
     <span>\
-      DEMO JOB ID\
+      PRINT REQUEST\
     </span>\
     <strong>\
-      ${printNumber(w.submittedJob.id)}\
+      ${esc(w.submittedJob.projectName)}\
     </strong>\
     <span>\
       Submitted ${dateTime(w.submittedJob.submittedAt)}\
     </span>\
   </div>\
   <div class="hero-actions">\
-    <a class="button button-lime" href="#/my-jobs">\
-      View My Jobs \
+    <a class="button button-lime" href="#/my-jobs/${encodeURIComponent(w.submittedJob.id)}">\
+      Track this request \
       <span>\
         ↗\
       </span>\
@@ -161,20 +168,12 @@ function wizardPanel(state, availableFilaments) {
       Print settings\
     </h2>\
     <p>\
-      Share preferences for staff to review.\
+      Choose your material and colour. Staff will confirm the final print settings.\
     </p>\
   </div>\
 </div>\
-<div class="form-grid two-col">\
-  <label class="field full-field">\
-    <span>Available filament <b>*</b></span>\
-    <select name="inventoryId" data-field="inventoryId" ${availableFilaments.length ? "required" : "disabled"}>\
-      ${availableFilaments.length ? availableFilaments.map((item) => `<option value="${esc(item.id)}" ${item.id === w.inventoryId ? "selected" : ""}>${esc(item.material)} · ${esc(item.color)} — Available${item.lowStock ? " · Low stock" : ""}</option>`).join("") : "<option value=\"\">No material and color combinations are currently available</option>"}\
-    </select>\
-    <small>Only filaments staff have marked Available can be selected.</small>\
-  </label>\
-  ${selectedFilament ? `<div class="material-choice-detail full-field"><span class="filament-swatch" style="--filament-color:${selectedFilament.hexColor || "#2b2b2b"}" role="img" aria-label="${esc(selectedFilament.color)} filament color"></span><div class="material-choice-copy"><strong>${esc(selectedFilament.material)} · ${esc(selectedFilament.color)}</strong><div class="request-filament-status"><span class="filament-status-label is-available">Available for new requests</span>${selectedFilament.lowStock ? '<span class="filament-status-label is-low-stock">Low stock · still available to request</span>' : ""}</div><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(selectedFilament.hexColor)}</code></div><div class="material-value"><span>RGB</span><code>${esc(selectedFilament.rgbColor)}</code></div></div></div></div>` : `<div class="empty-inventory-note full-field"><strong>No filament is currently listed as available.</strong><p>Staff must mark a filament Available in Materials before you can request it.</p></div>`}\
-</div>\
+${filamentPalette(filaments, w.inventoryId)}\
+<div class="palette-selection" data-filament-detail role="status" aria-live="polite" aria-atomic="true">${filamentSelectionDetails(selectedFilament)}</div>\
 <div class="inventory-banner">\
   <span>\
     ⓘ\
@@ -223,12 +222,10 @@ function wizardPanel(state, availableFilaments) {
         (optional)\
       </em>\
     </span>\
-    <textarea data-field="notes" maxlength="500" rows="4" placeholder="Requirements, orientation, or anything staff should know…">\
-      ${esc(w.notes)}\
-    </textarea>\
+    <textarea data-field="notes" maxlength="500" rows="4" placeholder="Requirements, orientation, or anything staff should know…">${esc(notes)}</textarea>\
     <small>\
       <span data-counter="notes">\
-        ${w.notes.length}\
+        ${notes.length}\
       </span>\
       /500\
     </small>\
@@ -324,7 +321,7 @@ ${reviewCard(w)}\
             Material\
           </span>\
           <strong>\
-            ${esc(w.material || "No option available")}\
+            <span data-summary-material>${esc(w.material || "Choose a filament")}</span>\
           </strong>\
         </div>\
         <div>\
@@ -332,7 +329,7 @@ ${reviewCard(w)}\
             Color\
           </span>\
           <strong>\
-            ${esc(w.color || "—")}\
+            <span data-summary-color>${esc(w.color || "—")}</span>\
           </strong>\
         </div>\
       </div>\
@@ -366,7 +363,7 @@ ${reviewCard(w)}\
 }
 
 function reviewCard(w) {
-  const rows = [["File", w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : "Choose a file"], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", w.notes || "None"]];
+  const rows = [["File", w.file ? `${w.file.name} (${formatBytes(w.file.sizeBytes)})` : "Choose a file"], ["Material", w.material || "No available option"], ["Color preference", w.color || "—"], ["Project name", w.projectName || "—"], ["Purpose", w.purpose || "—"], ["Notes", normalizeOptionalNote(w.notes) || "None"]];
   return `<div class="review-card">\
   ${rows.map(([label, value], i) => `<div class="review-row ${i > 4 ? "review-detail" : ""}">\
   <span>\
@@ -383,10 +380,10 @@ function reviewCard(w) {
 }
 
 export async function getStartedPage(state) {
-    const availableFilaments = await inventoryService.listAvailable();
+  const filaments = await inventoryService.listInventory();
+  const availableFilaments = filaments.filter(canSelectFilament);
   const selected = availableFilaments.find((item) => item.id === state.wizard.inventoryId)
-    || availableFilaments.find((item) => item.material === state.wizard.material && item.color === state.wizard.color)
-    || availableFilaments[0];
+    || availableFilaments.find((item) => item.material === state.wizard.material && item.color === state.wizard.color);
   if (selected) {
     state.wizard.inventoryId = selected.id;
     state.wizard.material = selected.material;
@@ -398,7 +395,7 @@ export async function getStartedPage(state) {
   }
   return `${publicHeader(state)}\
 <main class="get-started page-shell">\
-  ${wizardPanel(state, availableFilaments)}\
+  ${wizardPanel(state, filaments)}\
 </main>\
 ${footer()}`;
 }

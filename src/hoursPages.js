@@ -1,8 +1,8 @@
-import { hoursService } from "./services.js?v=20";
-import { authService } from "./authService.js?v=20";
-import { PERMISSIONS } from "./authorization.js?v=20";
-import { dateTime, esc } from "./pageShared.js?v=25";
-import { staffShell } from "./staffPages.js?v=24";
+import { hoursService } from "./services.js?v=2.2&rev=5";
+import { authService } from "./authService.js?v=2.2&rev=5";
+import { PERMISSIONS } from "./authorization.js?v=2.2&rev=5";
+import { dateTime, esc } from "./pageShared.js?v=2.2&rev=5";
+import { staffShell } from "./staffPages.js?v=2.2&rev=5";
 
 const formatHours = (centi) => `${(Number(centi || 0) / 100).toFixed(2).replace(/\.00$/, "")} h`;
 const signedHours = (centi) => `${centi > 0 ? "+" : "−"}${formatHours(Math.abs(centi))}`;
@@ -37,7 +37,7 @@ function requestCard(request, { ownId, admin = false } = {}) {
     ? `<p class="hours-request-outcome">Rejection reason: ${esc(request.rejectionReason)}</p>`
     : request.status === "Approved" ? transactionSummary : "";
 
-  return `<article class="hours-request-card">
+  return `<article class="hours-request-card" id="hours-request-${esc(request.id)}" tabindex="-1">
     <div class="hours-request-heading"><div><h3>${admin ? esc(request.staffName) : esc(verb)}</h3><span>${admin ? `${esc(request.staffRoleTitle)} · Level ${request.staffLevel}` : esc(verb)}</span></div>${statusBadge(request.status)}</div>
     <div class="hours-request-detail"><strong>${formatHours(request.hoursCenti)}</strong><span>${esc(verb)}</span></div>
     <p class="hours-request-reason">${esc(request.reason)}</p>

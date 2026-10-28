@@ -3,14 +3,23 @@ import {
   MOCK_JOBS,
   MOCK_NOTIFICATIONS,
   STATUSES,
-} from "./data.js?v=20";
-import { authService } from "./authService.js?v=20";
-import { getRole, PERMISSIONS } from "./authorization.js?v=20";
-import { API_BASE_URL } from "./apiClient.js?v=20";
-import { filesService } from "./filesService.js?v=20";
+} from "./data.js?v=2.2&rev=5";
+import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=2.2&rev=5";
+import { getRole, PERMISSIONS } from "./authorization.js?v=2.2&rev=5";
+import { API_BASE_URL } from "./apiClient.js?v=2.2&rev=5";
+import { filesService } from "./filesService.js?v=2.2&rev=5";
+
+import { projectInboxEvents } from "./inboxEvents.js?v=2.2&rev=5";
+import { claimable, initiallyApproved, isAssignedTo, staffCanSeeJob } from "./jobWorkflow.js?v=2.2&rev=5";
 
 const STORE_KEY = "three-d-print-farm-demo-v3";
 const DRAFT_KEY = "three-d-print-farm-draft-v2";
+export const LOCAL_DATA_KEYS = Object.freeze([
+  STORE_KEY, DRAFT_KEY, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY,
+  "three-d-print-farm-accent", "three-d-print-farm-theme", "three-d-print-farm-glass-transparency",
+]);
+const simulationTimers = new Set();
+const CLOSED_STATUSES = new Set(["COMPLETED", "COLLECTED", "CANCELLED", "REJECTED"]);
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const LEGACY_CSS_COLORS = {
   black: "#000000", blue: "#0000FF", gray: "#808080", grey: "#808080",
@@ -69,13 +78,15 @@ function inventoryNeedsMigration(original, normalized) {
 }
 
 function seedState() {
-  return {
+  return normalizeState({
     jobs: clone(MOCK_JOBS),
     notifications: clone(MOCK_NOTIFICATIONS),
     inventory: [],
     contributions: [],
     hours: { transactions: [], requests: [] },
-  };
+    inbox: [],
+    supervisorPresence: {},
+  });
 }
 
 function isRecord(value) {
@@ -104,14 +115,8 @@ function isValidState(value) {
     && typeof job.color === "string"
     && typeof job.submittedAt === "string"
     && STATUSES.includes(job.status)
-    && (job.assignedStaff === null || typeof job.assignedStaff === "string")
-    && Array.isArray(job.history)
-    && job.history.every((event) => (
-      isRecord(event)
-      && typeof event.type === "string"
-      && typeof event.at === "string"
-      && typeof event.by === "string"
-    ))
+    && (job.assignedStaff == null || typeof job.assignedStaff === "string")
+    && (job.history === undefined || job.history === null || Array.isArray(job.history))
   ));
   const notificationsAreValid = value.notifications.every((notification) => (
     isRecord(notification)
@@ -201,12 +206,34 @@ function isValidState(value) {
     ))
   );
 
-  return jobsAreValid && notificationsAreValid && inventoryIsValid && contributionsAreValid && hoursAreValid;
+  const inboxValid = value.inbox === undefined || (Array.isArray(value.inbox) && value.inbox.every((item) =>
+    isRecord(item) && typeof item.id === "string" && typeof item.userId === "string"
+    && typeof item.eventKey === "string" && typeof item.createdAt === "string"
+    && typeof item.title === "string" && typeof item.summary === "string"));
+  return jobsAreValid && notificationsAreValid && inventoryIsValid && contributionsAreValid && hoursAreValid && inboxValid;
 }
 
 function normalizeState(value) {
   return {
     ...value,
+    jobs: value.jobs.map((job) => ({
+      ...job,
+      assignedStaff: job.assignedStaff ?? null,
+      assignedStaffId: job.assignedStaffId || authService.getDemoIdentities().find((person) => person.name === job.assignedStaff)?.id || null,
+      // Grandfather work already in progress without fabricating a supervisor decision or time.
+      initialApproval: job.initialApproval || (job.status === "SUBMITTED" || job.status === "REJECTED"
+        ? null : { legacy: true }),
+      // Keep sparse legacy records; absent events never acquire invented timestamps.
+      history: (Array.isArray(job.history) ? job.history : []).filter((event) => (
+        isRecord(event) && typeof event.type === "string"
+      )).map((event) => ({
+        ...event,
+        at: typeof event.at === "string" && Number.isFinite(Date.parse(event.at)) ? event.at : null,
+        by: typeof event.by === "string" ? event.by : "Not recorded",
+      })),
+    })),
+    inbox: Array.isArray(value.inbox) ? value.inbox : [],
+    supervisorPresence: isRecord(value.supervisorPresence) ? value.supervisorPresence : {},
     inventory: Array.isArray(value.inventory) ? value.inventory.map(normalizeInventoryItem) : [],
     contributions: Array.isArray(value.contributions) ? value.contributions : [],
     hours: isRecord(value.hours) ? value.hours : { transactions: [], requests: [] },
@@ -273,7 +300,7 @@ function readState() {
         const normalized = normalizeState(parsed);
         const migratedContributions = migrateLegacyStaffContributions(normalized);
         const migratedInventory = inventoryNeedsMigration(parsed.inventory, normalized.inventory);
-        if (parsed.inventory === undefined || parsed.contributions === undefined || parsed.hours === undefined || migratedContributions || migratedInventory) writeState(normalized);
+        if (parsed.inventory === undefined || parsed.contributions === undefined || parsed.hours === undefined || migratedContributions || migratedInventory || JSON.stringify(parsed.jobs) !== JSON.stringify(normalized.jobs)) writeState(normalized);
         return normalized;
       }
       console.warn("Demo data has an invalid format; restoring the seed data.");
@@ -312,21 +339,79 @@ const assert = (condition, message) => {
 };
 const jobIndex = (id) => state.jobs.findIndex((job) => job.id === id);
 const update = (mutator) => {
+  const actor = currentUser();
   const run = () => {
+    assert(currentUser().id === actor.id, "Your identity changed. Try again with the selected account.");
     state = readState();
     const previous = clone(state);
-    const result = mutator();
-    if (!writeState(state)) {
+    try {
+      const result = mutator();
+      generateInboxEvents(previous, actor);
+      if (!writeState(state)) throw new Error("This browser could not save the change. Check that local storage is available and try again.");
+      globalThis.window?.dispatchEvent(new Event("printfarm:inbox-updated"));
+      return clone(result);
+    } catch (error) {
       state = previous;
-      throw new Error("This browser could not save the change. Check that local storage is available and try again.");
+      throw error;
     }
-    return clone(result);
   };
   if (globalThis.navigator?.locks?.request) {
     return globalThis.navigator.locks.request("three-d-print-farm-state", run);
   }
   return run();
 };
+
+const requireSupervisor = () => assert(authService.can(PERMISSIONS.JOBS_APPROVE), "Only Level 4 supervisors can approve requests and authorize printing.");
+const decisionReason = (value, required) => {
+  const reason = String(value || "").trim();
+  assert(reason.length <= 500 && (!required || reason.length > 0), "Enter a reason of 1–500 characters.");
+  return reason;
+};
+function generateInboxEvents(previous, actor) {
+  for (const event of projectInboxEvents(previous, state, actor, authService.getDemoIdentities(), getRole)) {
+    if (state.inbox.some((item) => item.userId === event.userId && item.eventKey === event.eventKey)) continue;
+    state.inbox.unshift({ id: localId("INBOX"), unread: true, ...event });
+  }
+}
+const ownsJob = (job) => job.submitterId
+  ? job.submitterId === currentUser().id
+  : job.submitterEmail.trim().toLowerCase() === currentUser().email.trim().toLowerCase();
+const requireStaff = () => assert(authService.can(PERMISSIONS.JOBS_MANAGE), "Access denied: staff access is required.");
+const requireFilamentChange = () => assert(authService.can(PERMISSIONS.FILAMENT_CHANGE), "Access denied: Level 3 or above is required.");
+
+export async function resetLocalData() {
+  const reset = () => {
+    // Explicit allowlist: never clear unrelated origin data or contact a backend.
+    for (const key of LOCAL_DATA_KEYS) localStorage.removeItem(key);
+    for (const timer of simulationTimers) clearTimeout(timer);
+    simulationTimers.clear();
+    authService.resetSession();
+    state = seedState();
+  };
+  if (globalThis.navigator?.locks?.request) return navigator.locks.request("three-d-print-farm-state", reset);
+  return reset();
+}
+
+function scheduleNotificationSimulation(notificationId) {
+  const timer = setTimeout(async () => {
+    simulationTimers.delete(timer);
+    try {
+      // Read and serialize the latest state so another tab's changes survive.
+      await update(() => {
+        const item = state.notifications.find((notification) => notification.id === notificationId);
+        if (item?.status === "PENDING") {
+          item.status = "SENT";
+          item.simulatedAt = nowIso();
+        }
+        return item || null;
+      });
+      globalThis.window?.dispatchEvent(new Event("printfarm:updated"));
+    } catch (error) {
+      console.warn("The simulated notification remains pending.", error);
+    }
+  }, 900);
+  simulationTimers.add(timer);
+}
 
 function validatePayload(payload) {
   assert(
@@ -351,10 +436,12 @@ export const jobsService = {
   apiBaseUrl: API_BASE_URL,
   refreshFromStorage() {
     state = readState();
-    return clone(state);
+    return true;
   },
   async listJobs(filters = {}) {
-    let jobs = [...state.jobs];
+    requireStaff();
+    state = readState();
+    let jobs = state.jobs.filter((job) => staffCanSeeJob(job, authService.can(PERMISSIONS.JOBS_APPROVE)));
     if (filters.status && filters.status !== "ALL") {
       jobs = jobs.filter((job) => job.status === filters.status);
     }
@@ -379,17 +466,27 @@ export const jobsService = {
     return clone(jobs);
   },
   async getJob(jobId) {
-    return clone(state.jobs.find((job) => job.id === jobId) || null);
+    state = readState();
+    const job = state.jobs.find((job) => job.id === jobId);
+    return job && (authService.can(PERMISSIONS.JOBS_MANAGE)
+      ? staffCanSeeJob(job, authService.can(PERMISSIONS.JOBS_APPROVE)) : ownsJob(job)) ? clone(job) : null;
+  },
+  async getMyJob(jobId) {
+    state = readState();
+    const job = state.jobs.find((job) => job.id === jobId && ownsJob(job));
+    return job ? clone(job) : null;
   },
   async listMyJobs() {
+    state = readState();
     return clone(
       state.jobs
-        .filter((job) => job.submitterEmail === currentUser().email)
+        .filter(ownsJob)
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
     );
   },
   async createJob(payload) {
     return update(() => {
+      assert(authService.can(PERMISSIONS.PRINT_REQUEST_CREATE), "Access denied: request submission is required.");
       validatePayload(payload);
       let id;
       do {
@@ -399,6 +496,7 @@ export const jobsService = {
       const job = {
         id,
         projectName: payload.projectName.trim(),
+        submitterId: currentUser().id,
         submitterName: currentUser().name,
         submitterEmail: currentUser().email,
         recipientEmail: currentUser().email,
@@ -406,10 +504,15 @@ export const jobsService = {
         fileSize: formatFileSize(payload.file.sizeBytes),
         material: payload.material,
         color: payload.color,
+        layerHeight: payload.layerHeight || "Not specified",
+        infill: payload.infill ?? null,
         purpose: payload.purpose || "Not specified",
         notes: payload.notes || "",
         submittedAt,
         status: "SUBMITTED",
+        initialApproval: null,
+        printAuthorization: null,
+        assignedStaffId: null,
         assignedStaff: null,
         pickupLocation: null,
         completedAt: null,
@@ -420,15 +523,18 @@ export const jobsService = {
     });
   },
   async claimJob(jobId) {
+    requireStaff();
     return update(() => {
+      requireStaff();
       const index = jobIndex(jobId);
       assert(index >= 0, "Job not found.");
       const job = state.jobs[index];
       assert(
-        job.status === "SUBMITTED" && !job.assignedStaff,
+        claimable(job),
         "This job is no longer available to claim.",
       );
       job.assignedStaff = currentStaff().name;
+      job.assignedStaffId = currentStaff().id;
       job.status = "IN_PROGRESS";
       job.history.push({
         type: "CLAIMED",
@@ -447,10 +553,15 @@ export const jobsService = {
       const index = jobIndex(jobId);
       assert(index >= 0, "Job not found.");
       const job = state.jobs[index];
-      assert(job.status !== "COMPLETED", "Completed jobs cannot be reassigned.");
+      assert(!CLOSED_STATUSES.has(job.status), "Closed jobs cannot be reassigned.");
       assert(job.assignedStaff, "Claim an unassigned job before reassigning it.");
       assert(job.assignedStaff !== targetIdentity.name, "Choose a different staff member.");
       job.assignedStaff = targetIdentity.name;
+      job.assignedStaffId = targetIdentity.id;
+      if (["AWAITING_AUTHORIZATION", "AUTHORIZED"].includes(job.status)) {
+        job.status = "IN_PROGRESS";
+        job.printAuthorization = null;
+      }
       job.history.push({
         type: "REASSIGNED",
         at: nowIso(),
@@ -460,16 +571,60 @@ export const jobsService = {
       return job;
     });
   },
-  async startPrinting(jobId) {
+  async reviewRequest(jobId, decision, reason = "") {
     return update(() => {
+      requireSupervisor();
+      const job = state.jobs.find((item) => item.id === jobId);
+      assert(job?.status === "SUBMITTED" && !job.initialApproval, "This request has already been reviewed or is no longer pending.");
+      assert(["approved", "rejected"].includes(decision), "Choose an approval decision.");
+      const note = decisionReason(reason, decision === "rejected");
+      const at = nowIso();
+      job.initialApproval = { decision, byId: currentUser().id, by: currentUser().name, at, reason: note };
+      job.status = decision === "approved" ? "APPROVED" : "REJECTED";
+      job.history.push({ type: job.status, at, by: currentUser().name, byId: currentUser().id, note, visibility: "submitter" });
+      return job;
+    });
+  },
+  async requestAuthorization(jobId) {
+    return update(() => {
+      requireStaff();
+      const job = state.jobs.find((item) => item.id === jobId);
+      assert(job && isAssignedTo(job, currentUser()), "Only the assigned staff member can request authorization.");
+      assert(job.status === "IN_PROGRESS" && initiallyApproved(job), "Only a prepared, approved job can request printing authorization.");
+      job.status = "AWAITING_AUTHORIZATION";
+      job.printAuthorization = { id: localId("AUTH"), decision: "pending", requestedById: currentUser().id, requestedBy: currentUser().name, requestedAt: nowIso() };
+      job.history.push({ type: "AUTHORIZATION_REQUESTED", at: job.printAuthorization.requestedAt, by: currentUser().name, byId: currentUser().id });
+      return job;
+    });
+  },
+  async reviewAuthorization(jobId, decision, reason = "", expectedRequestedAt = null, expectedAuthorizationId = null) {
+    return update(() => {
+      requireSupervisor();
+      const job = state.jobs.find((item) => item.id === jobId);
+      assert(job?.status === "AWAITING_AUTHORIZATION" && job.printAuthorization?.decision === "pending", "This print authorization is no longer pending.");
+      assert(!expectedAuthorizationId || job.printAuthorization.id === expectedAuthorizationId, "This notification belongs to an earlier authorization attempt. Review the current job.");
+      assert(!expectedRequestedAt || job.printAuthorization.requestedAt === expectedRequestedAt, "This notification belongs to an earlier authorization attempt. Review the current job.");
+      assert(["authorized", "revision"].includes(decision), "Choose an authorization decision.");
+      const note = decisionReason(reason, decision === "revision");
+      const at = nowIso();
+      job.printAuthorization = { ...job.printAuthorization, decision, byId: currentUser().id, by: currentUser().name, at, reason: note };
+      job.status = decision === "authorized" ? "AUTHORIZED" : "IN_PROGRESS";
+      job.history.push({ type: decision === "authorized" ? "AUTHORIZED" : "REVISION_REQUESTED", at, by: currentUser().name, byId: currentUser().id, note, visibility: "submitter" });
+      return job;
+    });
+  },
+  async startPrinting(jobId) {
+    requireStaff();
+    return update(() => {
+      requireStaff();
       const index = jobIndex(jobId);
       assert(index >= 0, "Job not found.");
       const job = state.jobs[index];
-      assert(job.status === "IN_PROGRESS", "Only an in-progress job can advance to printing.");
       assert(
-        job.assignedStaff === currentStaff().name,
+        isAssignedTo(job, currentStaff()),
         "Only the assigned demo staff member can advance this job.",
       );
+      assert(job.status === "AUTHORIZED" && job.printAuthorization?.decision === "authorized", "Supervisor print authorization is required before printing.");
       job.status = "PRINTING";
       job.history.push({
         type: "PRINTING",
@@ -480,13 +635,15 @@ export const jobsService = {
     });
   },
   async completeJob(jobId, payload) {
-    const result = update(() => {
+    requireStaff();
+    const result = await update(() => {
+      requireStaff();
       const index = jobIndex(jobId);
       assert(index >= 0, "Job not found.");
       const job = state.jobs[index];
       assert(job.status === "PRINTING", "Only a printing job can be completed.");
       assert(
-        job.assignedStaff === currentStaff().name,
+        isAssignedTo(job, currentStaff()),
         "Only the assigned demo staff member can complete this job.",
       );
       assert(
@@ -494,8 +651,11 @@ export const jobsService = {
         "Enter a pickup location.",
       );
       const completedAt = nowIso();
+      assert(payload.pickupLocation.trim().length <= 120, "Pickup location must be 120 characters or fewer.");
+      assert(String(payload.pickupInstructions || "").trim().length <= 500, "Pickup instructions must be 500 characters or fewer.");
       job.status = "COMPLETED";
       job.pickupLocation = payload.pickupLocation.trim();
+      job.pickupInstructions = String(payload.pickupInstructions || "").trim();
       job.completedAt = completedAt;
       job.history.push({
         type: "COMPLETED",
@@ -525,37 +685,60 @@ export const jobsService = {
     });
     if (result.notification) {
       const notificationId = result.notification.id;
-      setTimeout(() => {
-        const notification = state.notifications.find((item) => item.id === notificationId);
-        if (!notification || notification.status !== "PENDING") {
-          return;
-        }
-        notification.status = "SENT";
-        notification.simulatedAt = nowIso();
-        writeState(state);
-        window.dispatchEvent(new Event("printfarm:updated"));
-      }, 900);
+      scheduleNotificationSimulation(notificationId);
     }
     return result;
   },
+  async updatePickup(jobId, payload) {
+    return update(() => {
+      requireStaff();
+      const job = state.jobs.find((item) => item.id === jobId);
+      assert(job?.status === "COMPLETED", "Pickup details can only be edited while a print awaits collection.");
+      const location = String(payload.pickupLocation || "").trim();
+      const instructions = String(payload.pickupInstructions || "").trim();
+      assert(location && location.length <= 120, "Enter a pickup location of up to 120 characters.");
+      assert(instructions.length <= 500, "Pickup instructions must be 500 characters or fewer.");
+      if (job.pickupLocation !== location || (job.pickupInstructions || "") !== instructions) {
+        job.pickupLocation = location;
+        job.pickupInstructions = instructions;
+        job.history.push({ type: "PICKUP_UPDATED", at: nowIso(), by: currentStaff().name });
+      }
+      return job;
+    });
+  },
+  async collectJob(jobId) {
+    requireStaff();
+    return update(() => {
+      requireStaff();
+      const job = state.jobs.find((item) => item.id === jobId);
+      assert(job, "Job not found.");
+      assert(job.status === "COMPLETED" && !job.collectedAt, "Only a print ready for pickup can be marked as collected.");
+      job.status = "COLLECTED";
+      job.collectedAt = nowIso();
+      job.history.push({ type: "COLLECTED", at: job.collectedAt, by: currentStaff().name });
+      return job;
+    });
+  },
   async listJobEvents(jobId) {
-    const job = state.jobs.find((item) => item.id === jobId);
+    const job = await this.getJob(jobId);
     return clone(job?.history || []);
   },
   async listNotifications(jobId = null) {
-    return clone(
-      jobId
-        ? state.notifications.filter((item) => item.jobId === jobId)
-        : state.notifications,
-    );
+    requireStaff();
+    state = readState();
+    const jobs = state.jobs.filter((job) => staffCanSeeJob(job, authService.can(PERMISSIONS.JOBS_APPROVE)));
+    const allowed = new Set(jobs.map((job) => job.id));
+    return clone(state.notifications.filter((item) => allowed.has(item.jobId) && (!jobId || item.jobId === jobId)));
   },
   async getNotification(notificationId) {
-    return clone(state.notifications.find((item) => item.id === notificationId) || null);
+    requireStaff();
+    return (await this.listNotifications()).find((item) => item.id === notificationId) || null;
   },
   async retryNotification(notificationId) {
-    const result = update(() => {
+    assert(authService.can(PERMISSIONS.NOTIFICATIONS_RETRY), "Access denied: notification retry is restricted to staff.");
+    const result = await update(() => {
       const item = state.notifications.find((notification) => notification.id === notificationId);
-      assert(item, "Notification record not found.");
+      assert(item && staffCanSeeJob(state.jobs.find((job) => job.id === item.jobId) || {}, authService.can(PERMISSIONS.JOBS_APPROVE)), "Notification record not found.");
       assert(item.status === "FAILED", "Only a failed demo notification can be retried.");
       item.status = "PENDING";
       item.retriedAt = nowIso();
@@ -568,36 +751,33 @@ export const jobsService = {
       });
       return item;
     });
-    setTimeout(() => {
-      const item = state.notifications.find((notification) => notification.id === notificationId);
-      if (item?.status !== "PENDING") {
-        return;
-      }
-      item.status = "SENT";
-      item.simulatedAt = nowIso();
-      writeState(state);
-      window.dispatchEvent(new Event("printfarm:updated"));
-    }, 900);
+    scheduleNotificationSimulation(notificationId);
     return result;
   },
   async summary() {
+    requireStaff();
+    state = readState();
     const today = new Date().toDateString();
+    const jobs = state.jobs.filter((job) => staffCanSeeJob(job, authService.can(PERMISSIONS.JOBS_APPROVE)));
     return {
-      unclaimed: state.jobs.filter((job) => job.status === "SUBMITTED" && !job.assignedStaff).length,
-      inProgress: state.jobs.filter((job) => job.status === "IN_PROGRESS").length,
-      printing: state.jobs.filter((job) => job.status === "PRINTING").length,
-      completedToday: state.jobs.filter((job) => (
-        job.status === "COMPLETED"
+      unclaimed: jobs.filter(claimable).length,
+      pendingReview: jobs.filter((job) => job.status === "SUBMITTED").length,
+      inProgress: jobs.filter((job) => ["IN_PROGRESS", "AWAITING_AUTHORIZATION", "AUTHORIZED"].includes(job.status)).length,
+      printing: jobs.filter((job) => job.status === "PRINTING").length,
+      completedToday: jobs.filter((job) => (
+        ["COMPLETED", "COLLECTED"].includes(job.status)
         && job.completedAt
         && new Date(job.completedAt).toDateString() === today
       )).length,
-      total: state.jobs.length,
+      total: jobs.length,
     };
   },
   async listMyActiveJobs() {
+    requireStaff();
+    state = readState();
     return clone(
       state.jobs.filter((job) => (
-        job.assignedStaff === currentStaff().name && job.status !== "COMPLETED"
+        isAssignedTo(job, currentStaff()) && staffCanSeeJob(job, authService.can(PERMISSIONS.JOBS_APPROVE)) && !CLOSED_STATUSES.has(job.status)
       )),
     );
   },
@@ -605,6 +785,9 @@ export const jobsService = {
     return clone(MATERIALS);
   },
   async resetDemo() {
+    requireStaff();
+    for (const timer of simulationTimers) clearTimeout(timer);
+    simulationTimers.clear();
     state = seedState();
     writeState(state);
     return true;
@@ -643,6 +826,41 @@ export const jobsService = {
   },
 };
 
+export const inboxService = {
+  async list() {
+    requireStaff();
+    state = readState();
+    return clone(state.inbox.filter((item) => item.userId === currentUser().id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)));
+  },
+  async open(id) {
+    return update(() => {
+      requireStaff();
+      const index = state.inbox.findIndex((item) => item.id === id && item.userId === currentUser().id);
+      assert(index >= 0, "This notification is no longer in your inbox.");
+      return state.inbox.splice(index, 1)[0];
+    });
+  },
+};
+export const presenceService = {
+  async list() {
+    requireStaff();
+    state = readState();
+    return clone(authService.getDemoIdentities().filter((identity) => getRole(identity.roleId)?.level === 4)
+      .map((identity) => ({ id: identity.id, name: identity.name, present: state.supervisorPresence[identity.id]?.present === true,
+        updatedAt: state.supervisorPresence[identity.id]?.updatedAt || null })));
+  },
+  async set(present) {
+    return update(() => {
+      assert(authService.can(PERMISSIONS.SUPERVISOR_PRESENCE), "Only Level 4 can update their own supervisor presence.");
+      assert(typeof present === "boolean", "Choose a valid presence setting.");
+      const record = { present, updatedAt: nowIso() };
+      state.supervisorPresence[currentUser().id] = record;
+      return record;
+    });
+  },
+};
+
 const MATERIAL_IDS = new Set(MATERIALS.map(({ id }) => id));
 const localId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`}`;
 function withColorData(item) {
@@ -676,6 +894,7 @@ export const inventoryService = {
     return item ? clone(withColorData(item)) : null;
   },
   async add(payload) {
+    requireFilamentChange();
     return update(() => {
       const normalized = {
         material: String(payload.material || ""),
@@ -698,7 +917,20 @@ export const inventoryService = {
       return item;
     });
   },
+  async update(id, payload) {
+    requireFilamentChange();
+    return update(() => {
+      const item = state.inventory.find((entry) => entry.id === id);
+      assert(item, "Filament entry not found.");
+      const normalized = { ...item, color: String(payload.color || "").trim(), hexColor: normalizeHex(payload.hexColor) };
+      validateInventory(normalized);
+      assert(!state.inventory.some((other) => other.id !== id && other.material === item.material && other.color.toLowerCase() === normalized.color.toLowerCase()), "A filament with this material and color already exists.");
+      Object.assign(item, normalized, { updatedAt: nowIso() });
+      return item;
+    });
+  },
   async toggleAvailability(id) {
+    requireFilamentChange();
     return update(() => {
       const item = state.inventory.find((entry) => entry.id === id);
       assert(item, "Inventory entry not found. Refresh the page and try again.");
@@ -708,6 +940,7 @@ export const inventoryService = {
     });
   },
   async toggleLowStock(id) {
+    requireFilamentChange();
     return update(() => {
       const item = state.inventory.find((entry) => entry.id === id);
       assert(item, "Inventory entry not found. Refresh the page and try again.");
@@ -717,6 +950,7 @@ export const inventoryService = {
     });
   },
   async remove(id) {
+    requireFilamentChange();
     return update(() => {
       const index = state.inventory.findIndex((entry) => entry.id === id);
       assert(index >= 0, "Filament entry not found. Refresh the page and try again.");
@@ -983,6 +1217,7 @@ export const hoursService = {
     assert(submissionKey.length >= 8 && submissionKey.length <= 120, "This request form has expired. Refresh the page and try again.");
 
     return update(() => {
+      requireHoursPermission(PERMISSIONS.HOURS_REQUEST);
       const duplicate = hoursRequests().find((request) => request.submissionKey === submissionKey);
       if (duplicate) {
         assert(duplicate.requesterId === actor.id, "This request key is already in use.");
@@ -1028,6 +1263,7 @@ export const hoursService = {
     assert(Number.isSafeInteger(expectedBalanceCenti) && expectedBalanceCenti >= 0, "Refresh the staff details before confirming this contribution.");
 
     return update(() => {
+      requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
       const duplicate = state.contributions.find((contribution) => (
         contribution.submissionKey === submissionKey && contribution.createdById === actor.id
       ));
@@ -1086,6 +1322,7 @@ export const hoursService = {
     assert(Number.isSafeInteger(expectedBalanceCenti) && expectedBalanceCenti >= 0, "Refresh the staff details before confirming this adjustment.");
 
     return update(() => {
+      requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
       const duplicate = hoursTransactions().find((transaction) => (
         transaction.actorId === actor.id && transaction.submissionKey === submissionKey
       ));
@@ -1119,6 +1356,7 @@ export const hoursService = {
     requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
     const reviewer = currentUser();
     return update(() => {
+      requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
       const request = hoursRequests().find((item) => item.id === requestId);
       assert(request, "Request not found. Refresh the page and try again.");
       assert(request.status === "Pending", "This request has already been reviewed.");
@@ -1159,6 +1397,7 @@ export const hoursService = {
     const reason = String(rejectionReason || "").trim();
     assert(reason.length <= 500, "Keep the rejection reason under 500 characters.");
     return update(() => {
+      requireHoursPermission(PERMISSIONS.HOURS_ADMIN);
       const request = hoursRequests().find((item) => item.id === requestId);
       assert(request, "Request not found. Refresh the page and try again.");
       assert(request.status === "Pending", "This request has already been reviewed.");

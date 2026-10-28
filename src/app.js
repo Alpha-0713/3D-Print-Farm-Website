@@ -1,12 +1,19 @@
-import { contributionsService, hoursService, inventoryService, jobsService, rgbFromHex } from "./services.js?v=20";
-import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=20";
-import { notificationsService } from "./notificationsService.js?v=20";
-import { dateTime, esc, printNumber } from "./pageShared.js?v=25";
-import { accessDeniedPage, homePage } from "./publicPages.js?v=24";
-import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=20";
-import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=20";
-import { getStartedPage } from "./requestWizard.js?v=25";
-import { myJobsPage } from "./studentPages.js?v=24";
+import { bindPersonalInbox, syncPersonalInbox } from "./personalInbox.js?v=2.2&rev=5";
+import { presenceService } from "./services.js?v=2.2&rev=5";
+import { commitPage } from "./pageCommit.js?v=2.2&rev=5";
+import { syncFloatingControls } from "./floatingControls.js?v=2.2&rev=5";
+import { syncSidebarSelection } from "./sidebarSelection.js?v=2.2&rev=5";
+import { contributionsService, hoursService, inventoryService, jobsService, resetLocalData, rgbFromHex } from "./services.js?v=2.2&rev=5";
+import { filesService, getModelFileExtension, MAX_MODEL_FILE_SIZE } from "./filesService.js?v=2.2&rev=5";
+import { notificationsService } from "./notificationsService.js?v=2.2&rev=5";
+import { dateTime, esc } from "./pageShared.js?v=2.2&rev=5";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=2.2&rev=5";
+import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=2.2&rev=5";
+import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=2.2&rev=5";
+import { getStartedPage, normalizeOptionalNote } from "./requestWizard.js?v=2.2&rev=5";
+import { applyFilamentSelection } from "./filamentPalette.js?v=2.2&rev=5";
+import { normalizeHexInput } from "./filamentColor.js?v=2.2&rev=5";
+import { myJobDetailsPage, myJobsPage } from "./studentPages.js?v=2.2&rev=5";
 import {
   activeJobsPage,
   jobDetailsPage,
@@ -14,8 +21,8 @@ import {
   staffMaterialForm,
   staffMaterials,
   staffOverview,
-} from "./staffPages.js?v=24";
-import { staffHours } from "./hoursPages.js?v=24";
+} from "./staffPages.js?v=2.2&rev=5";
+import { staffHours } from "./hoursPages.js?v=2.2&rev=5";
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
@@ -38,43 +45,67 @@ const state = {
     projectName: "",
     purpose: "Personal project",
     notes: "",
-    material: "PLA",
-    color: "Black",
+    material: "",
+    color: "",
     submittedJob: null,
   },
 };
 
-const ACCENT_STORAGE_KEY = "three-d-print-farm-accent";
-const ACCENT_IDS = new Set(["green", "blue", "purple", "teal", "orange", "rose"]);
+const THEME_STORAGE_KEY = "three-d-print-farm-theme";
+const THEME_IDS = new Set(["light", "dark"]);
+function systemTheme() {
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
 
 function syncAppearanceControls() {
   const root = document.documentElement;
-  root.dataset.theme = "dark";
-  const accent = root.dataset.accent || "green";
-  const names = { green: "Green", blue: "Blue", purple: "Purple", teal: "Teal", orange: "Orange", rose: "Rose" };
-  document.querySelectorAll(".accent-option").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.accent === accent)));
-  document.querySelectorAll(".accent-picker summary").forEach((summary) => {
-    summary.setAttribute("aria-label", "Choose accent color. Current color: " + (names[accent] || "Green"));
-    summary.querySelector(".accent-picker-label").textContent = names[accent] || "Green";
+  const theme = THEME_IDS.has(root.dataset.theme) ? root.dataset.theme : "dark";
+  root.dataset.theme = theme;
+  root.dataset.accent = "monochrome";
+  document.querySelectorAll(".accent-picker > summary").forEach((summary) => {
+    summary.setAttribute("aria-label", "Appearance settings. " + (theme === "light" ? "Light" : "Dark") + " theme");
   });
+  document.querySelectorAll(".theme-choice").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.theme === theme)));
+  let themeWasChosen = false;
+  try {
+    themeWasChosen = localStorage.getItem(THEME_STORAGE_KEY) !== null;
+  } catch {
+    // Keep the appearance controls usable if browser storage is unavailable.
+  }
+  document.querySelectorAll("#appearance-theme-note").forEach((note) => {
+    note.textContent = themeWasChosen ? "Saved on this device." : "Following your device preference.";
+  });
+  document.querySelectorAll(".appearance-system-reset").forEach((button) => {
+    button.hidden = !themeWasChosen;
+  });
+
   const color = getComputedStyle(root).getPropertyValue("--accent-primary").trim();
+  const background = theme === "light" ? "#f5f5f7" : "#111112";
   const favicon = document.querySelector('link[rel="icon"]');
   if (favicon && /^#[\da-f]{6}$/i.test(color)) {
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><rect width="36" height="36" rx="7" fill="#181818"/><path d="M5 7h26v6H5zm0 9h20v6H5zm0 9h14v6H5z" fill="' + color + '"/></svg>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><rect width="36" height="36" rx="7" fill="' + background + '"/><path d="M5 7h26v6H5zm0 9h20v6H5zm0 9h14v6H5z" fill="' + color + '"/></svg>';
     favicon.href = "data:image/svg+xml," + encodeURIComponent(svg);
   }
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = "#181818";
+  if (meta) meta.content = background;
+  modelPreviewModule?.syncPreviewAppearance?.();
 }
 
-function applyAppearance({ accent, persist = true } = {}) {
+function applyAppearance({ theme, persist = true } = {}) {
   const root = document.documentElement;
-  if (ACCENT_IDS.has(accent)) root.dataset.accent = accent;
-  if (persist) {
-    try {
-      localStorage.setItem(ACCENT_STORAGE_KEY, root.dataset.accent || "green");
-    } catch {
-      // Keep the current page responsive when browser storage is unavailable.
+  if (theme === "system") {
+    root.dataset.theme = systemTheme();
+    if (persist) {
+      try { localStorage.removeItem(THEME_STORAGE_KEY); } catch {
+        // Keep the current page responsive when browser storage is unavailable.
+      }
+    }
+  } else if (THEME_IDS.has(theme)) {
+    root.dataset.theme = theme;
+    if (persist) {
+      try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch {
+        // Keep the current page responsive when browser storage is unavailable.
+      }
     }
   }
   syncAppearanceControls();
@@ -105,7 +136,7 @@ function clearRouteMotion() {
 function prepareRouteMotion(routeChanged) {
   if (!routeChanged || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
-  const entrance = app.querySelector(".public-main > section:first-child, .get-started, .my-jobs, .staff-app, .access-denied");
+  const entrance = app.querySelector(".public-main > section:first-child, .get-started, .my-jobs, .staff-content, .access-denied");
   entrance?.classList.add("route-enter");
   if (entrance) window.setTimeout(() => entrance.classList.remove("route-enter"), 420);
 
@@ -174,6 +205,7 @@ function prepareRouteMotion(routeChanged) {
 const savedDraft = jobsService.getDraft();
 if (savedDraft) {
   Object.assign(state.wizard, savedDraft, {
+    notes: normalizeOptionalNote(savedDraft.notes),
     step: 1,
     file: null,
     modelFile: null,
@@ -207,6 +239,8 @@ function parseRoute() {
   if (filament) return { page: "filament", id: decodeRouteId(filament[1]) };
 
   if (value === "/get-started") return { page: "get-started" };
+  const ownDetail = value.match(/^\/my-jobs\/([^/?#]+)$/);
+  if (ownDetail) return { page: "my-job", id: decodeRouteId(ownDetail[1]) };
   if (value === "/my-jobs") return { page: "my-jobs" };
   if (value === "/staff" || value === "/staff/") return { page: "staff" };
   if (value === "/staff/queue") return { page: "staff", redirect: true };
@@ -236,8 +270,12 @@ async function render() {
     ? PERMISSIONS.HOURS_ADMIN
     : ROUTE_PERMISSIONS[route.page];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    document.title = "Access restricted · 3D Print Farm · v2.0.0";
-    app.innerHTML = accessDeniedPage(state, requiredPermission);
+    document.title = "Access restricted · 3D Print Farm · v2.2";
+    commitPage(app, accessDeniedPage(state, requiredPermission));
+    syncSidebarSelection(app);
+    syncFloatingControls(app);
+    syncAppearanceControls();
+    await syncPersonalInbox(app);
     prepareRouteMotion(routeChanged);
     window.scrollTo({ top: 0, behavior: "auto" });
     return;
@@ -245,43 +283,52 @@ async function render() {
   const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v2.0.0";
+    document.title = "Staff Portal · School 3D Print Farm — v2.2";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v2.0.0";
-  } else if (route.page === "my-jobs") {
-    document.title = "My Jobs · School 3D Print Farm — v2.0.0";
+    document.title = "Get Started · School 3D Print Farm — v2.2";
+  } else if (["my-jobs", "my-job"].includes(route.page)) {
+    document.title = "My Print Jobs · School 3D Print Farm — v2.2";
   } else {
-    document.title = "School 3D Print Farm Website — v2.0.0";
+    document.title = "School 3D Print Farm Website — v2.2";
   }
 
+  let pageHtml;
   if (route.page === "home") {
-    app.innerHTML = homePage(route.section, state, await inventoryService.listInventory());
+    pageHtml = homePage(route.section, state, await inventoryService.listInventory());
   } else if (route.page === "get-started") {
-    app.innerHTML = await getStartedPage(state);
+    pageHtml = await getStartedPage(state);
   } else if (route.page === "my-jobs") {
-    app.innerHTML = await myJobsPage(state);
+    pageHtml = await myJobsPage(state);
+  } else if (route.page === "my-job") {
+    pageHtml = await myJobDetailsPage(state, route.id);
   } else if (route.page === "staff") {
-    app.innerHTML = await staffOverview();
+    pageHtml = await staffOverview();
   } else if (route.page === "active") {
-    app.innerHTML = await activeJobsPage();
+    pageHtml = await activeJobsPage();
   } else if (route.page === "materials") {
-    app.innerHTML = await staffMaterials();
+    pageHtml = await staffMaterials();
   } else if (route.page === "material-new") {
-    app.innerHTML = staffMaterialForm();
+    pageHtml = staffMaterialForm();
   } else if (route.page === "filament") {
-    app.innerHTML = await staffMaterialDetail(route.id);
+    pageHtml = await staffMaterialDetail(route.id);
   } else if (route.page === "hours") {
-    app.innerHTML = await staffHours({ staffId: route.staffId || "", search: state.hoursStaffSearch });
+    pageHtml = await staffHours({ staffId: route.staffId || "", search: state.hoursStaffSearch });
   } else if (route.page === "job") {
-    app.innerHTML = await jobDetailsPage(route.id);
+    pageHtml = await jobDetailsPage(route.id);
   }
+  if (revision !== renderRevision) return;
+  commitPage(app, pageHtml);
+  syncSidebarSelection(app);
+  syncFloatingControls(app);
+  syncAppearanceControls();
+  await syncPersonalInbox(app);
   prepareRouteMotion(routeChanged);
 
   if (route.page === "get-started" && state.wizard.modelFile && !state.wizard.submittedJob) {
     const selectedFile = state.wizard.modelFile;
     const stage = document.querySelector("#model-preview");
     try {
-      modelPreviewModule ||= await import("./modelPreview.js?v=20");
+      modelPreviewModule ||= await import("./modelPreview.js?v=2.2&rev=5");
       if (revision !== renderRevision || selectedFile !== state.wizard.modelFile || !stage?.isConnected) return;
       await modelPreviewModule.mountModelPreview(stage, selectedFile, (status, message = "") => {
         if (revision !== renderRevision || selectedFile !== state.wizard.modelFile) return;
@@ -314,7 +361,10 @@ async function render() {
       });
     });
   } else {
-    window.scrollTo({ top: 0, behavior: "auto" });
+    const requestedHoursId = route.page === "hours" ? new URLSearchParams(location.hash.split("?")[1] || "").get("request") : null;
+    const hoursRequest = requestedHoursId ? document.getElementById(`hours-request-${requestedHoursId}`) : null;
+    if (hoursRequest) { hoursRequest.focus(); hoursRequest.scrollIntoView({ block: "center", behavior: "auto" }); }
+    else if (routeChanged) window.scrollTo({ top: 0, behavior: "auto" });
   }
 }
 
@@ -502,7 +552,7 @@ function openCompletionDialog(job) {
     </button>\
   </div>\
   <p class="dialog-job">\
-    ${printNumber(job.id)} · ${esc(job.projectName)}\
+    ${esc(job.projectName)}\
   </p>\
   <label class="field">\
     <span>\
@@ -511,8 +561,9 @@ function openCompletionDialog(job) {
         *\
       </b>\
     </span>\
-    <input name="pickupLocation" type="text" required maxlength="120" placeholder="e.g. School office" />\
+    <input name="pickupLocation" type="text" required maxlength="120" value="${esc(job.pickupLocation || "")}" placeholder="Enter the approved collection location" />\
   </label>\
+  <label class="field"><span>Pickup instructions <small>(optional)</small></span><textarea name="pickupInstructions" maxlength="500" rows="3" placeholder="Collection hours or who to ask for">${esc(job.pickupInstructions || "")}</textarea></label>\
   <div class="recipient-field">\
     <span>\
       Recipient email\
@@ -598,6 +649,7 @@ function openCompletionDialog(job) {
     try {
       const result = await jobsService.completeJob(form.dataset.jobId, {
         pickupLocation: form.elements.pickupLocation.value,
+        pickupInstructions: form.elements.pickupInstructions.value,
         notifyRecipient: form.elements.notifyRecipient.checked,
       });
 
@@ -634,15 +686,22 @@ async function doAction(action, target) {
   }
 
   try {
-    if (action === "switch-role") {
+    if (action === "reset-local-data") {
+      target.disabled = true;
+      await resetLocalData();
+      location.hash = "#/";
+      window.location.reload();
+      return;
+    } else if (action === "switch-role") {
       target.closest(".role-switcher")?.removeAttribute("open");
       if (!authService.switchRole(target.dataset.identityId)) throw new Error("That demonstration identity is unavailable.");
+      await syncPersonalInbox(app);
       await render();
-    } else if (action === "set-accent") {
-      if (ACCENT_IDS.has(target.dataset.accent)) {
-        applyAppearance({ accent: target.dataset.accent });
-        target.closest(".accent-picker").open = false;
-      }
+    } else if (action === "set-theme") {
+      if (THEME_IDS.has(target.dataset.theme)) applyAppearance({ theme: target.dataset.theme });
+      return;
+    } else if (action === "use-system-theme") {
+      applyAppearance({ theme: "system" });
       return;
     } else if (action === "inventory-toggle") {
       const item = await inventoryService.toggleAvailability(id);
@@ -658,9 +717,36 @@ async function doAction(action, target) {
       await inventoryService.remove(id);
       toast("Filament deleted and removed from new requests.");
       await render();
+    } else if (action === "toggle-presence") {
+      await presenceService.set(target.dataset.present !== "true");
+      await syncPersonalInbox(app);
+    } else if (["approve-job", "reject-job", "authorize-print", "revise-print"].includes(action)) {
+      const job = await jobsService.getJob(id);
+      if (!job) throw new Error("Job not available.");
+      let reason = "";
+      if (["reject-job", "revise-print"].includes(action)) {
+        reason = window.prompt(action === "reject-job" ? "Reason for rejecting this request (required):" : "What must change before printing? (required):", "");
+        if (reason === null) return;
+        if (!reason.trim()) throw new Error("Enter a reason so the requester and responsible staff know what to change.");
+      }
+      const labels = { "approve-job": "Approve request", "reject-job": "Reject request", "authorize-print": "Authorize printing", "revise-print": "Return for changes" };
+      if (!window.confirm(`${labels[action]} for “${job.projectName}”?${reason ? `\n\n${reason}` : ""}`)) return;
+      if (["approve-job", "reject-job"].includes(action)) await jobsService.reviewRequest(id, action === "approve-job" ? "approved" : "rejected", reason);
+      else await jobsService.reviewAuthorization(id, action === "authorize-print" ? "authorized" : "revision", reason, target.dataset.expectedAt || null, target.dataset.authorizationId || null);
+      toast("Supervisor decision saved.");
+      await render();
+    } else if (action === "request-authorization") {
+      if (!window.confirm("Confirm the model, material, and print preparation are ready for supervisor review?")) return;
+      await jobsService.requestAuthorization(id);
+      toast("Print authorization requested. A Level 4 supervisor will review the job.");
+      await render();
     } else if (action === "claim-job") {
       await jobsService.claimJob(id);
       toast("Job claimed and assigned to " + authService.getCurrentIdentity().name + ".");
+      await render();
+    } else if (action === "collect-job") {
+      await jobsService.collectJob(id);
+      toast("Collection recorded. This request is now complete.");
       await render();
     } else if (action === "start-printing") {
       await jobsService.startPrinting(id);
@@ -763,6 +849,7 @@ async function doAction(action, target) {
 
       try {
         const { modelFile, previewStatus, fileFeedback, linkUrl, modelSource, sourceUrl, loadingLink, ...request } = state.wizard;
+        request.notes = normalizeOptionalNote(request.notes);
         const job = await jobsService.createJob({ ...request, file: state.wizard.file });
         state.wizard.submittedJob = job;
         state.wizard.submitting = false;
@@ -788,19 +875,18 @@ async function doAction(action, target) {
         projectName: "",
         purpose: "Personal project",
         notes: "",
-        material: "PLA",
-        color: "Black",
+        material: "",
+        color: "",
         submittedJob: null,
       };
       await render();
     } else if (action === "menu-toggle") {
       state.menuOpen = !state.menuOpen;
       await render();
-    } else if (action === "copy-job") {
-      await navigator.clipboard?.writeText(printNumber(id));
-      toast("Print number copied.");
+
     }
   } catch (error) {
+    if (action === "reset-local-data") target.disabled = false;
     toast(error.message || "The action could not be completed.", "error");
   }
 }
@@ -862,10 +948,18 @@ app.addEventListener("submit", async (event) => {
       await render();
       const role = authService.getCurrentRole();
       toast(`${account.name} demo account created · Level ${role.level}.`);
+    } else if (action === "job-pickup-update") {
+      await jobsService.updatePickup(form.dataset.id, values);
+      await render();
+      toast("Pickup details saved.");
     } else if (action === "job-reassign") {
       const job = await jobsService.reassignJob(form.dataset.id, values.assigneeId);
       await render();
       toast("Job reassigned to " + job.assignedStaff + ".");
+    } else if (action === "inventory-update") {
+      await inventoryService.update(form.dataset.id, values);
+      await render();
+      toast("Filament colour updated.");
     } else if (action === "inventory-add") {
       await inventoryService.add(values);
       location.hash = "#/staff/materials";
@@ -956,6 +1050,13 @@ app.addEventListener("input", (event) => {
   if (target.matches("[data-hours-preview-input]")) updateHoursPreview(target.form);
 
   if (target.matches("[data-hex-input]")) {
+    const cursor = target.selectionStart;
+    const before = target.value;
+    target.value = normalizeHexInput(before);
+    if (cursor !== null) {
+      const nextCursor = Math.max(1, cursor + target.value.length - before.length);
+      target.setSelectionRange(nextCursor, nextCursor);
+    }
     const preview = target.form?.querySelector("[data-rgb-preview]");
     const rgb = rgbFromHex(target.value);
     const rgbText = preview?.querySelector("[data-color-rgb]");
@@ -998,12 +1099,20 @@ app.addEventListener("change", async (event) => {
     state.wizard[key] = target.value;
 
     if (key === "inventoryId") {
-      const selection = await inventoryService.getItem(target.value);
-      if (selection) {
-        state.wizard.material = selection.material;
-        state.wizard.color = selection.color;
+      const selectedId = target.value;
+      try {
+        const selection = await inventoryService.getItem(selectedId);
+        if (state.wizard.inventoryId !== selectedId) return;
+        applyFilamentSelection(app, state.wizard, selection);
+        // Native radios retain focus and scroll position; the 3D preview stays mounted.
+      } catch (error) {
+        if (state.wizard.inventoryId !== selectedId) return;
+        state.wizard.inventoryId = "";
+        state.wizard.material = "";
+        state.wizard.color = "";
+        toast(error.message, "error");
+        await render();
       }
-      render();
       return;
     }
 
@@ -1025,12 +1134,29 @@ app.addEventListener("drop", (event) => {
   void setFile(event.dataTransfer.files?.[0]);
 });
 
+const systemColorScheme = window.matchMedia?.("(prefers-color-scheme: light)");
+if (systemColorScheme?.addEventListener) {
+  systemColorScheme.addEventListener("change", () => {
+    try {
+      if (localStorage.getItem(THEME_STORAGE_KEY) === null) {
+        applyAppearance({ theme: systemTheme(), persist: false });
+      }
+    } catch {
+      applyAppearance({ theme: systemTheme(), persist: false });
+    }
+  });
+}
+
 window.addEventListener("hashchange", () => {
   state.menuOpen = false;
   render();
 });
 
 window.addEventListener("storage", async (event) => {
+  if (event.key === "three-d-print-farm-demo-v3" && event.newValue === null) {
+    window.location.reload();
+    return;
+  }
   if (event.key === DEMO_ROLE_STORAGE_KEY) {
     await render();
     return;
@@ -1039,9 +1165,9 @@ window.addEventListener("storage", async (event) => {
     await render();
     return;
   }
-  if (event.key === ACCENT_STORAGE_KEY) {
+  if (event.key === THEME_STORAGE_KEY) {
     applyAppearance({
-      accent: ACCENT_IDS.has(event.newValue) ? event.newValue : "green",
+      theme: THEME_IDS.has(event.newValue) ? event.newValue : systemTheme(),
       persist: false,
     });
     return;
@@ -1050,8 +1176,11 @@ window.addEventListener("storage", async (event) => {
   await jobsService.refreshFromStorage();
   await render();
 });
-
 window.addEventListener("printfarm:updated", render);
+window.addEventListener("printfarm:inbox-updated", () => {
+  void syncPersonalInbox(app).catch((error) => toast(error.message, "error"));
+});
+bindPersonalInbox(app, (message) => toast(message, "error"));
 
 syncAppearanceControls();
 render();

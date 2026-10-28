@@ -1,0 +1,122 @@
+<!doctype html><html lang="en" data-theme="dark" data-accent="monochrome"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inbox and workflow browser checks · v2.2</title>
+<link rel="stylesheet" href="../src/styles.css?v=2.2&amp;rev=8">
+<style>.check-toolbar{padding:20px 28px;border-bottom:1px solid var(--border)}.check-toolbar h1{font-size:20px;margin:0 0 8px}.check-toolbar button{padding:10px 16px;background:var(--accent-primary);color:var(--accent-foreground);border:0;cursor:pointer}.check-toolbar a{margin-left:20px;text-decoration:underline}#results{font:13px system-ui;white-space:pre-wrap;line-height:1.7}.check-failed{color:var(--error-ink)}#fixture{position:relative}</style>
+</head><body><div class="check-toolbar"><h1>Inbox and workflow browser checks</h1><button id="run" disabled>Run browser checks</button><a href="../#/staff">Open the website</a><p>Creates synthetic test records, then restores this origin’s previous application data. No backend or messages.</p><div id="results" role="status">Ready. Run at desktop and mobile widths.</div></div><div id="fixture"></div>
+<script>window.addEventListener("error", event => { document.querySelector("#results").textContent = "FAIL · " + event.message; });</script>
+<script type="module">
+import { jobsService, inboxService, presenceService, hoursService, LOCAL_DATA_KEYS } from "../src/services.js?v=2.2&rev=5";
+import { authService } from "../src/authService.js?v=2.2&rev=5";
+import { staffShell, jobDetailsPage } from "../src/staffPages.js?v=2.2&rev=5";
+import { myJobsPage } from "../src/studentPages.js?v=2.2&rev=5";
+import { commitPage } from "../src/pageCommit.js?v=2.2&rev=5";
+import { syncSidebarSelection } from "../src/sidebarSelection.js?v=2.2&rev=5";
+import { syncFloatingControls } from "../src/floatingControls.js?v=2.2&rev=5";
+import { bindPersonalInbox, syncPersonalInbox } from "../src/personalInbox.js?v=2.2&rev=5";
+const root = document.querySelector('#fixture'), results = document.querySelector('#results');
+const key = 'three-d-print-farm-demo-v3';
+const frame = () => new Promise(requestAnimationFrame);
+async function until(predicate, label) { for(let i=0;i<120;i++) { if(predicate())return;await frame(); } throw new Error('Timed out: '+label); }
+async function render(active = 'overview') { commitPage(root, staffShell('<h1>Workflow / inbox fixture</h1><p>Production controls with synthetic requests.</p>',active)); syncFloatingControls(root); syncSidebarSelection(root); await syncPersonalInbox(root); }
+const errors = [];
+bindPersonalInbox(root, (message) => errors.push(message));
+window.addEventListener('printfarm:inbox-updated', () => { void syncPersonalInbox(root); });
+root.addEventListener('click', async (event) => {
+  const control = event.target.closest('[data-action="toggle-presence"]');
+  if(control) { await presenceService.set(control.dataset.present !== 'true'); await syncPersonalInbox(root); }
+});
+document.querySelector('#run').addEventListener('click', async () => {
+  const button = document.querySelector('#run');button.disabled=true;
+  const backup = Object.fromEntries(LOCAL_DATA_KEYS.map((key)=>[key,localStorage.getItem(key)]));
+  const originalHash=location.hash;
+  results.textContent='Running browser checks…';
+  window.scrollTo(0,0);
+  const passed=[];
+  const check=(condition,label)=>{if(!condition)throw new Error(label);passed.push('PASS · '+label);};
+  const inside=(element)=>{const r=element.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;};
+  const openMenus=()=>root.querySelectorAll('.accent-picker[open],.role-switcher[open],.inbox-picker[open]').length;
+  try {
+    errors.length=0;
+    authService.switchRole('demo-person-01');await syncPersonalInbox(root);
+    localStorage.setItem(key, JSON.stringify({jobs:[],notifications:[],inventory:[{id:'qa',material:'PLA',color:'Gray',hexColor:'#808080',lowStock:false,available:true}],contributions:[],hours:{transactions:[],requests:[]},inbox:[],supervisorPresence:{}}));
+    authService.switchRole('demo-person-04');await render();
+    const inbox=root.querySelector('.inbox-picker'), appearance=root.querySelector('.accent-picker'), profile=root.querySelector('.role-switcher');
+    inbox.querySelector('summary').click();await frame();
+    check(root.querySelector('.inbox-empty')&&root.querySelector('.inbox-dot').hidden,'Empty inbox has no unread dot');
+    await until(()=>getComputedStyle(inbox.querySelector('.inbox-panel')).visibility==='visible'&&inside(inbox.querySelector('.inbox-panel')),'inbox positioning');
+    check(inside(inbox.querySelector('.inbox-panel')),'Inbox fits inside the visible viewport');
+    appearance.querySelector('summary').click();await frame();
+    check(appearance.open&&!inbox.open&&openMenus()===1,'Opening Appearance closes Inbox');
+    const job=await jobsService.createJob({projectName:'QA browser bracket',file:{name:'qa.stl',sizeBytes:256},inventoryId:'qa',material:'PLA',color:'Gray',notes:'Synthetic browser check'});
+    await until(()=>!root.querySelector('.inbox-dot').hidden,'new inbox indicator');
+    await until(()=>document.querySelector('.inbox-toast'),'notification toast');
+    check(appearance.open&&openMenus()===1,'A new notification toast leaves the active menu alone');
+    check(document.querySelector('.inbox-toast').textContent.includes('New print request'),'New notifications show a working popup');
+    document.querySelector('[data-toast-open]').click();
+    await until(()=>root.querySelector('.inbox-detail'),'toast opens notification details');
+    check(root.querySelector('.inbox-picker').open&&openMenus()===1&&!appearance.open,'Toast action replaces the current menu with one notification detail view');
+    root.querySelector('[data-action="inbox-back"]').click();await until(()=>root.querySelector('.inbox-empty'),'toast back');
+    check(inbox.open,'Back keeps the inbox popover open');
+    // Reinsert a clearly labelled UI fixture for the remaining open/delete checks.
+    const fixtureState=JSON.parse(localStorage.getItem(key));
+    fixtureState.inbox.push({id:'qa-ui-review',userId:'demo-person-04',eventKey:'qa-ui-review',createdAt:new Date().toISOString(),kind:'initial-review',jobId:job.id,title:'New print request',summary:'QA browser bracket',context:'QA browser bracket',message:'Synthetic browser check',unread:true});
+    localStorage.setItem(key,JSON.stringify(fixtureState));await syncPersonalInbox(root);
+    inbox.querySelector('summary').click();await frame();
+    inbox.querySelector('summary').click();await frame();
+    check(!appearance.open&&inbox.open&&openMenus()===1,'Inbox replaces Appearance');
+    const id=(await inboxService.list())[0].id;
+    root.querySelector('.inbox-entry').click();
+    await until(()=>root.querySelector('.inbox-detail'),'notification details');
+    check((await inboxService.list()).length===0&&root.querySelector('.inbox-dot').hidden,'Opening deletes the entry immediately and removes its unread dot');
+    check(root.querySelectorAll('.inbox-panel').length===1&&root.querySelector('.inbox-detail').textContent.includes('QA browser bracket'),'Deleted notification keeps its details in the same popover');
+    check(root.querySelector('[data-action="approve-job"]')&&root.querySelector('[data-action="reject-job"]'),'Pending supervisor notification exposes guarded decision actions');
+    await jobsService.reviewRequest(job.id,'approved');await syncPersonalInbox(root);
+    check(root.querySelector('.inbox-resolved')&&!root.querySelector('[data-action="approve-job"]'),'Resolved notifications remove obsolete approval actions');
+    root.querySelector('[data-action="inbox-back"]').click();await until(()=>root.querySelector('.inbox-empty'),'back to inbox');
+    check(!root.querySelector('.inbox-detail'),'Back returns to Inbox without resurrecting the deleted entry');
+    inbox.querySelector('summary').focus();inbox.querySelector('summary').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await frame();
+    check(!inbox.open&&document.activeElement===inbox.querySelector('summary'),'Escape closes the menu and restores trigger focus');
+    inbox.querySelector('summary').click();await frame();
+    root.querySelector('.staff-content h1').click();await frame();
+    check(!inbox.open,'Clicking outside dismisses the popover');
+    const toggle=root.querySelector('[data-action="toggle-presence"]');toggle.click();await until(()=>root.querySelector('[role="switch"]')?.getAttribute('aria-checked')==='true','supervisor presence');
+    check((await presenceService.list())[0].present,'Presence control saves the current supervisor’s state');
+    authService.switchRole('demo-person-02');await render();
+    check(root.querySelector('.presence-person').textContent.includes('In the Print Farm')&&!root.querySelector('[data-action="toggle-presence"]'),'Members see supervisor presence with no edit control');
+    check(root.querySelectorAll('.inbox-entry').length===1,'Switching accounts loads only that person’s inbox');
+    await jobsService.claimJob(job.id);
+    root.querySelector('.inbox-picker summary').click();await frame();root.querySelector('.inbox-entry').click();await until(()=>root.querySelector('.inbox-detail'),'member details');
+    check(!root.querySelector('[data-action="claim-job"]')&&root.querySelector('.inbox-resolved'),'Already-claimed job notifications cannot offer duplicate claims');
+    await jobsService.requestAuthorization(job.id);
+    authService.switchRole('demo-person-04');await render();
+    root.querySelector('.inbox-picker summary').click();await frame();root.querySelector('.inbox-entry').click();await until(()=>root.querySelector('[data-action="authorize-print"]'),'print authorization actions');
+    check(root.querySelector('[data-action="revise-print"]'),'Printing authorization notification includes authorization and revision controls');
+    await jobsService.reviewAuthorization(job.id,'authorized');
+    authService.switchRole('demo-person-02');await render();
+    check(!root.querySelector('.inbox-detail')&&root.querySelectorAll('.inbox-entry').length===1,'Another account cannot inherit opened notification details');
+    const list=await inboxService.list();const saved=JSON.parse(localStorage.getItem(key));
+    saved.inbox.push(...Array.from({length:45},(_,i)=>({...list[0],id:'qa-long-'+i,eventKey:'qa-long-'+i,createdAt:new Date(Date.now()-i*1000).toISOString()})));
+    localStorage.setItem(key,JSON.stringify(saved));await syncPersonalInbox(root);
+    root.querySelector('.inbox-picker summary').click();await frame();
+    const panel=root.querySelector('.inbox-panel');
+    check(inside(panel)&&panel.scrollHeight>panel.clientHeight&&getComputedStyle(panel).overflowY==='auto','Long lists scroll inside a bounded menu');
+    const times=(await inboxService.list()).map(item=>item.createdAt);check(times.every((time,i)=>i===0||times[i-1]>=time),'Notifications are reverse chronological');
+    const memberProfile=root.querySelector('.role-switcher');memberProfile.querySelector('summary').click();await frame();
+    check(openMenus()===1&&memberProfile.open,'Profile also obeys the one-menu rule');
+    const current=await jobsService.getJob(job.id);await jobsService.startPrinting(job.id);await jobsService.completeJob(job.id,{pickupLocation:'QA desk',notifyRecipient:false});await jobsService.collectJob(job.id);
+    check((await jobsService.getJob(job.id)).status==='COLLECTED','Approved and authorized job can finish through collection');
+    check(!(await jobDetailsPage(job.id)).toLowerCase().includes('job history'),'Staff details contain Print Progress without Job History');
+    for(const theme of ['light','dark']){document.documentElement.dataset.theme=theme;const reset=root.querySelector('[data-action="reset-local-data"]');const colour=getComputedStyle(reset).color;const expected=getComputedStyle(document.documentElement).getPropertyValue('--error-ink').trim();check(colour!==getComputedStyle(root).color&&Boolean(expected),'Reset uses destructive colour in '+theme+' mode');}
+    check(root.querySelectorAll('.status i').length===0,'Print status badges have no decorative dots');
+    authService.switchRole('demo-person-04');await render();const before=(await inboxService.list()).length;await jobsService.createJob({projectName:'QA hours context',file:{name:'qa.stl',sizeBytes:256},inventoryId:'qa',material:'PLA',color:'Gray'});await syncPersonalInbox(root);check((await inboxService.list()).length===before+1,'Saved updates add one notification without duplicate rerender effects');
+    check(!errors.length,'No inbox action errors');
+    results.className='';results.textContent=passed.length+' browser checks passed at '+innerWidth+'px\n'+passed.join('\n');
+  } catch(error){results.className='check-failed';results.textContent=passed.join('\n')+'\nFAIL · '+error.message+'\n'+JSON.stringify({panel:root.querySelector('.inbox-panel')?.getBoundingClientRect().toJSON(),style:root.querySelector('.inbox-panel')?.getAttribute('style'),picker:root.querySelector('.inbox-picker')?.getBoundingClientRect().toJSON(),viewport:{w:innerWidth,h:innerHeight},scrollY},null,2);console.error(error);}
+  finally {
+    authService.switchRole('demo-person-01');await syncPersonalInbox(root);
+    for(const [key,value] of Object.entries(backup)) {if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}
+    history.replaceState(null,'',location.pathname+originalHash);jobsService.refreshFromStorage();button.disabled=false;
+  }
+});
+document.querySelector("#run").disabled=false;
+</script></body></html>

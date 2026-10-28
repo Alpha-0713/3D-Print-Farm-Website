@@ -1,59 +1,47 @@
-import { MATERIALS } from "./data.js?v=20";
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=20";
-import { notificationsService } from "./notificationsService.js?v=20";
-import { appearanceControls, dateTime, esc, logo, printNumber, roleSwitcher, shortDate, statusBadge } from "./pageShared.js?v=25";
-import { authService } from "./authService.js?v=20";
-import { PERMISSIONS, ROLES } from "./authorization.js?v=20";
+import { claimable, isAssignedTo } from "./jobWorkflow.js?v=2.2&rev=5";
+import { MATERIALS } from "./data.js?v=2.2&rev=5";
+import { contributionsService, inventoryService, jobsService } from "./services.js?v=2.2&rev=5";
+import { notificationsService } from "./notificationsService.js?v=2.2&rev=5";
+import { toolbarControls, dateTime, esc, logo, localDataControls, shortDate, statusBadge } from "./pageShared.js?v=2.2&rev=5";
+import { authService } from "./authService.js?v=2.2&rev=5";
+import { jobProgress, pickupDetails } from "./jobProgress.js?v=2.2&rev=5";
+import { PERMISSIONS, ROLES } from "./authorization.js?v=2.2&rev=5";
 
 export function staffShell(content, active = "overview") {
-  const links = [["overview", "Overview", "⌂", "#/staff"], ["active", "My active jobs", "◷", "#/staff/active"], ["materials", "Materials", "◇", "#/staff/materials"], ["hours", "Hours", "◴", "#/staff/hours"]]
+  const icons = {
+    overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    active: '<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M18 12h.01"/>',
+    materials: '<path d="m12 3 10 5-10 5L2 8l10-5ZM2 12l10 5 10-5M2 16l10 5 10-5"/>',
+    hours: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5h5"/>',
+  };
+  const links = [["overview", "Overview", "#/staff"], ["active", "My active jobs", "#/staff/active"], ["materials", "Materials", "#/staff/materials"], ["hours", "Hours", "#/staff/hours"]]
     .filter(([id]) => id !== "materials" || authService.can(PERMISSIONS.FILAMENT_VIEW));
-  const pageLabel = ({ overview: "Overview", active: "My active jobs", materials: "Materials", "material-new": "Add filament", hours: "Hours" })[active] || "Staff Portal";
-  return `<div class="staff-app">\
+  const activeNavigation = active === "material-new" ? "materials" : active;
+  const identity = authService.getCurrentIdentity();
+  return `<div class="staff-app" data-identity-id="${esc(identity.id)}" data-role-id="${esc(identity.roleId)}">\
   <aside class="staff-sidebar">\
     <div class="sidebar-brand">\
-      <div class="sidebar-brand-main">${logo()}${appearanceControls()}</div>\
+      <div class="sidebar-brand-main">${logo()}</div>\
     </div>\
     <nav aria-label="Staff navigation">\
-  ${links.map(([id, label, icon, href]) => `<a class="sidebar-link ${active === id ? "selected" : ""}" href="${href}" ${active === id ? 'aria-current="page"' : ""}>\
-  <span>\
-    ${icon}\
-  </span>\
-  ${label}\
+      <span class="sidebar-selection" aria-hidden="true"></span>\
+  ${links.map(([id, label, href]) => `<a class="sidebar-link ${activeNavigation === id ? "selected" : ""}" href="${href}" ${activeNavigation === id ? 'aria-current="page"' : ""}>\
+  <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[id]}</svg></span>\
+  <span class="sidebar-label">${label}</span>\
 </a>`).join("")}\
     </nav>\
     <div class="sidebar-bottom">\
       <a class="back-public" href="#/">\
-        ← Back to public website\
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10H2m7-7-7 7 7 7"/></svg><span>Back to public website</span>\
       </a>\
     </div>\
   </aside>\
   <div class="staff-main">\
-    <header class="staff-topbar">\
-      <div class="breadcrumbs">\
-        <span>\
-          Staff Portal\
-        </span>\
-        <b>\
-          /\
-        </b>\
-        <strong>\
-          ${pageLabel}\
-        </strong>\
-      </div>\
-      <div class="topbar-right">\
-        <span class="demo-pill">\
-          DEMO WORKSPACE\
-        </span>\
-        <span class="top-date">\
-          ${new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}\
-        </span>\
-        ${roleSwitcher()}\
-        </div>\
-    </header>\
+    <div class="staff-toolbar"><div class="supervisor-presence" data-supervisor-presence aria-label="Print Farm supervisor presence"></div>${toolbarControls()}</div>\
     <div class="staff-content">\
       ${content}\
     </div>\
+    ${localDataControls()}\
   </div>\
 </div>`;
 }
@@ -81,14 +69,14 @@ function jobTable(jobs) {
   <td>
     <a class="table-project" href="#/staff/jobs/${encodeURIComponent(job.id)}">
       <strong class="table-project-name">${esc(job.projectName)}</strong>
-      <span class="table-project-number">${printNumber(job.id)}</span>
+
     </a>
   </td>
   <td>${esc(job.submitterName)}<small>${esc(job.submitterEmail)}</small></td>
-  <td>${shortDate(job.submittedAt)}<small>${new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(job.submittedAt))}</small></td>
+  <td>${shortDate(job.submittedAt)}<small>${Number.isFinite(Date.parse(job.submittedAt)) ? new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(job.submittedAt)) : "Time not recorded"}</small></td>
   <td>${statusBadge(job.status)}</td>
-  <td>${job.assignedStaff ? `<span class="assigned"><i></i>${esc(job.assignedStaff)}</span>` : `<span class="unassigned">Unassigned</span>`}</td>
-  <td><a class="table-action ${job.status === "SUBMITTED" && !job.assignedStaff ? "action-highlight" : ""}" href="#/staff/jobs/${encodeURIComponent(job.id)}">${job.status === "SUBMITTED" && !job.assignedStaff ? "Review" : "View"} <span>↗</span></a></td>
+  <td>${job.assignedStaff ? `<span class="assigned">${esc(job.assignedStaff)}</span>` : `<span class="unassigned">Unassigned</span>`}</td>
+  <td><a class="table-action ${["SUBMITTED", "APPROVED", "AWAITING_AUTHORIZATION"].includes(job.status) ? "action-highlight" : ""}" href="#/staff/jobs/${encodeURIComponent(job.id)}">${job.status === "APPROVED" ? "Claim" : ["SUBMITTED", "AWAITING_AUTHORIZATION"].includes(job.status) ? "Review" : "View"} <span>↗</span></a></td>
 </tr>`).join("")}
     </tbody>
   </table>
@@ -97,7 +85,7 @@ function jobTable(jobs) {
 
 export async function staffOverview() {
   const [summary, jobs] = await Promise.all([jobsService.summary(), jobsService.listJobs({ sort: "newest" })]);
-  const cards = [["UNCLAIMED JOBS", summary.unclaimed, "Awaiting staff review", "lime"], ["IN PROGRESS", summary.inProgress, "Claimed by staff", "blue"], ["PRINTING", summary.printing, "Active print stage", "amber"], ["COMPLETED TODAY", summary.completedToday, "Marked complete today", "green"]];
+  const cards = [["AVAILABLE JOBS", summary.unclaimed, "Approved for claiming", "lime"], ["IN PROGRESS", summary.inProgress, "Claimed by staff", "blue"], ["PRINTING", summary.printing, "Active print stage", "amber"], ["COMPLETED TODAY", summary.completedToday, "Marked complete today", "green"]];
   return staffShell(`<div class="staff-page-heading">\
   <div>\
     <span class="eyebrow">\
@@ -115,6 +103,8 @@ export async function staffOverview() {
     <span>→</span>\
   </a>\
 </div>\
+${authService.can(PERMISSIONS.JOBS_APPROVE) ? `<section class="staff-section supervisor-review-queue"><div class="staff-section-head"><div><h2>Supervisor decisions</h2><p>Initial requests and prepared jobs awaiting your approval.</p></div><span class="demo-pill">LEVEL 4</span></div>${jobTable(jobs.filter((job) => ["SUBMITTED", "AWAITING_AUTHORIZATION"].includes(job.status)))}</section>` : ""}\
+${jobs.some(claimable) ? `<section class="staff-section available-jobs"><div class="staff-section-head"><div><h2>Available jobs</h2><p>Supervisor-approved requests ready for staff to claim.</p></div></div>${jobTable(jobs.filter(claimable))}</section>` : ""}\
 <section class="metric-grid">\
   ${cards.map(([label, count, caption, color]) => `<article class="metric-card">\
   <div>\
@@ -174,9 +164,6 @@ export async function activeJobsPage() {
 ${jobs.length ? `<div class="active-jobs-grid">\
   ${jobs.map((job) => `<article class="active-job-card">\
   <div class="active-card-top">\
-    <span class="job-id">\
-      ${printNumber(job.id)}\
-    </span>\
     ${statusBadge(job.status)}\
   </div>\
   <h2>\
@@ -230,7 +217,7 @@ export async function staffMaterials() {
       : `<div class="filament-readonly-status"><span class="filament-status-label ${item.lowStock ? "is-low-stock" : ""}">Low Stock · ${item.lowStock ? "On" : "Off"}</span><span class="filament-status-label ${item.available ? "is-available" : "is-unavailable"}">${item.available ? "Available" : "Unavailable"}</span></div>`;
     return `<article class="filament-inventory-card" role="listitem">
   <span class="filament-inventory-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${item.hexColor || "transparent"}" aria-label="${item.hexColor ? `Filament color ${esc(item.color)}` : "Color code needs verification"}" role="img"></span>
-  <div class="filament-inventory-main"><div class="filament-inventory-title"><h3>${esc(item.material)}</h3><span>${esc(item.color)}</span></div>${code}</div>
+  <div class="filament-inventory-main"><div class="filament-inventory-title"><h3>${esc(item.material)}</h3><span>${esc(item.color)}</span><a class="filament-edit-link" href="#/staff/materials/${encodeURIComponent(item.id)}" aria-label="${canChangeFilament ? "Edit" : "View"} ${esc(item.material)} ${esc(item.color)}">${canChangeFilament ? "Edit colour" : "Details"} →</a></div>${code}</div>
   ${status}
 </article>`;
   }).join("")}</div>` : `<div class="empty-state inventory-empty"><span>◇</span><h2>No filament entries yet</h2><p>Add a filament type and verified HEX color to make it available for print requests.</p></div>`;
@@ -245,7 +232,7 @@ export function staffMaterialForm() {
 <section class="filament-panel filament-form-panel"><form class="inventory-add-form" data-form="inventory-add">
   <label class="field"><span>Material type <b>*</b></span><select name="material" required><option value="">Choose material</option>${MATERIALS.map((material) => `<option value="${esc(material.id)}">${esc(material.name)} · ${esc(material.descriptor)}</option>`).join("")}</select></label>
   <label class="field"><span>Color name <b>*</b></span><input name="color" type="text" maxlength="60" placeholder="e.g. Matte black" autocomplete="off" required /></label>
-  <label class="field"><span>HEX color <b>*</b></span><input name="hexColor" data-hex-input type="text" inputmode="text" autocomplete="off" placeholder="#2F80ED" pattern="^#?[0-9A-Fa-f]{6}$" title="Enter six hexadecimal digits, with an optional #" minlength="6" maxlength="7" required /><small>RGB is calculated from this HEX value; the saved HEX is normalized to uppercase.</small></label>
+  <label class="field"><span>HEX color <b>*</b></span><input name="hexColor" data-hex-input type="text" inputmode="text" autocomplete="off" value="#" placeholder="#2F80ED" pattern="#[0-9A-Fa-f]{6}" title="Enter six hexadecimal digits after #" minlength="7" spellcheck="false" required /><small>Type six hexadecimal characters after #, or paste a colour code. RGB is calculated automatically.</small></label>
   <div class="field"><span>Color preview</span><output class="color-input-preview" data-rgb-preview><span class="color-input-swatch" data-color-swatch aria-hidden="true"></span><span data-color-rgb>Enter a six-digit HEX value.</span></output></div>
   <p class="inventory-default-status">New entries start with Low Stock off and Available on.</p>
   <div class="inventory-form-actions"><a class="button button-outline" href="#/staff/materials">Cancel</a><button class="button button-lime" type="submit">Add filament <span>＋</span></button></div>
@@ -257,7 +244,11 @@ export async function staffMaterialDetail(id) {
   if (!item) return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Current inventory</a></div><div class="empty-state"><span>◇</span><h2>Filament not found</h2><p>This inventory entry may have been removed or the link is invalid.</p><a class="button button-outline" href="#/staff/materials">Back to current inventory</a></div>`, "materials");
   return staffShell(`<div class="detail-back"><a href="#/staff/materials">← Filament availability</a></div>
 <div class="staff-page-heading"><div><span class="eyebrow">MATERIALS / FILAMENT DETAILS</span><h1>${esc(item.material)} · ${esc(item.color)}</h1><p>${item.available ? "Available for new print requests" : "Unavailable for new print requests"}${item.lowStock ? " · Low stock" : ""}</p></div></div>
-<section class="filament-panel material-detail-panel"><div class="material-detail-color"><span class="filament-inventory-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${item.hexColor || "transparent"}" aria-hidden="true"></span><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(item.hexColor || "Needs verification")}</code></div><div class="material-value"><span>RGB</span><code>${esc(item.rgbColor || "Needs verification")}</code></div></div></div><div class="filament-readonly-status"><span class="filament-status-label ${item.lowStock ? "is-low-stock" : ""}">Low Stock · ${item.lowStock ? "On" : "Off"}</span><span class="filament-status-label ${item.available ? "is-available" : "is-unavailable"}">${item.available ? "Available" : "Unavailable"}</span></div></section>`, "materials");
+<section class="filament-panel material-detail-panel"><div class="material-detail-color"><span class="filament-inventory-swatch ${item.hexColor ? "" : "is-missing"}" style="--filament-color:${item.hexColor || "transparent"}" aria-hidden="true"></span><div class="material-values"><div class="material-value"><span>HEX</span><code>${esc(item.hexColor || "Needs verification")}</code></div><div class="material-value"><span>RGB</span><code>${esc(item.rgbColor || "Needs verification")}</code></div></div></div><div class="filament-readonly-status"><span class="filament-status-label ${item.lowStock ? "is-low-stock" : ""}">Low Stock · ${item.lowStock ? "On" : "Off"}</span><span class="filament-status-label ${item.available ? "is-available" : "is-unavailable"}">${item.available ? "Available" : "Unavailable"}</span></div></section>${authService.can(PERMISSIONS.FILAMENT_CHANGE) ? `<section class="filament-panel"><h2>Edit filament colour</h2><form class="inventory-add-form" data-form="inventory-update" data-id="${esc(item.id)}">
+  <label class="field"><span>Colour name</span><input name="color" maxlength="60" value="${esc(item.color)}" required /></label>
+  <label class="field"><span>HEX colour</span><input name="hexColor" data-hex-input value="${esc(item.hexColor || "#")}" pattern="#[0-9A-Fa-f]{6}" minlength="7" autocomplete="off" spellcheck="false" required /><small>Type six hexadecimal characters after #.</small></label>
+  <div class="field"><span>Colour preview</span><output class="color-input-preview" data-rgb-preview><span class="color-input-swatch" data-color-swatch style="--filament-color:${item.hexColor || "transparent"}" aria-hidden="true"></span><span data-color-rgb>${esc(item.rgbColor || "Enter a six-digit HEX value.")}</span></output></div>
+  <div class="inventory-form-actions"><button class="button button-lime" type="submit">Save colour</button></div></form></section>` : ""}`, "materials");
 }
 
 const localDateValue = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -282,10 +273,6 @@ export async function staffContributions(filters = {}, editingId = "") {
 <div class="staff-note"><span>ⓘ</span><p>Student names use the demo's existing mock profiles and entered display names because no student directory or authentication backend exists. Records are stored locally in this browser.</p></div>`, "contributions");
 }
 
-function historyLabel(event) {
-  return ({ SUBMITTED: "Request submitted", CLAIMED: "Job claimed", PRINTING: "Marked as printing", COMPLETED: "Marked as completed", NOTIFICATION_SIMULATED: "Pickup notification simulated", NOTIFICATION_RETRIED_SIMULATED: "Notification retry simulated", REASSIGNED: "Job reassigned" })[event.type] || event.type;
-}
-
 export async function jobDetailsPage(jobId) {
   const [job, notifications] = await Promise.all([jobsService.getJob(jobId), notificationsService.listForJob(jobId)]);
   if (!job) return staffShell(`<div class="empty-state">\
@@ -302,27 +289,23 @@ export async function jobDetailsPage(jobId) {
     Back to Overview\
   </a>\
 </div>`);
-  const action = job.status === "SUBMITTED" && !job.assignedStaff ? `<button class="button button-lime" data-action="claim-job" data-id="${esc(job.id)}">\
-  Claim Job \
-  <span>\
-    →\
-  </span>\
-</button>` : job.status === "IN_PROGRESS" && job.assignedStaff === authService.getCurrentIdentity().name ? `<button class="button button-lime" data-action="start-printing" data-id="${esc(job.id)}">\
-  Mark as Printing \
-  <span>\
-    →\
-  </span>\
-</button>` : job.status === "PRINTING" && job.assignedStaff === authService.getCurrentIdentity().name ? `<button class="button button-lime" data-action="complete-job" data-id="${esc(job.id)}">\
-  Mark as Completed \
-  <span>\
-    ✓\
-  </span>\
-</button>` : "";
+  const button = (action, label, style = "button-lime") => `<button class="button ${style}" data-action="${action}" data-id="${esc(job.id)}" data-expected-at="${esc(job.printAuthorization?.requestedAt || "")}" data-authorization-id="${esc(job.printAuthorization?.id || "")}">${label}</button>`;
+  const supervisor = authService.can(PERMISSIONS.JOBS_APPROVE);
+  const responsible = isAssignedTo(job, authService.getCurrentIdentity());
+  const action = job.status === "SUBMITTED" && supervisor
+    ? button("approve-job", "Approve request") + button("reject-job", "Reject request", "button-outline destructive-action")
+    : claimable(job) ? button("claim-job", "Claim job")
+    : job.status === "IN_PROGRESS" && responsible ? button("request-authorization", "Request print authorization")
+    : job.status === "AWAITING_AUTHORIZATION" && supervisor
+      ? button("authorize-print", "Authorize printing") + button("revise-print", "Request changes", "button-outline")
+    : job.status === "AUTHORIZED" && responsible ? button("start-printing", "Start printing")
+    : job.status === "PRINTING" && responsible ? button("complete-job", "Mark ready for pickup") : "";
+  const collectionAction = job.status === "COMPLETED" ? `<button class="button button-lime" data-action="collect-job" data-id="${esc(job.id)}">Mark as collected <span>✓</span></button>` : "";
   const canReassign = authService.can(PERMISSIONS.JOBS_REASSIGN);
   const reassignTargets = authService.getDemoIdentities().filter((identity) => (
     ROLES[identity.roleId]?.level >= 2 && identity.name !== job.assignedStaff
   ));
-  const reassignForm = canReassign && job.status !== "COMPLETED" && job.assignedStaff && reassignTargets.length
+  const reassignForm = canReassign && !["COMPLETED", "COLLECTED", "CANCELLED", "REJECTED"].includes(job.status) && job.assignedStaff && reassignTargets.length
     ? `<section class="detail-section job-reassignment">
   <h2>Reassign task</h2>
   <p>Choose a different Level 2 or above member for this job.</p>
@@ -371,7 +354,7 @@ export async function jobDetailsPage(jobId) {
     /\
   </span>\
   <span>\
-    ${printNumber(job.id)}\
+    ${esc(job.projectName)}\
   </span>\
 </div>\
 <div class="detail-title-row">\
@@ -383,9 +366,6 @@ export async function jobDetailsPage(jobId) {
       ${esc(job.projectName)}\
     </h1>\
     <div class="detail-title-meta">\
-      <span>\
-        ${printNumber(job.id)}\
-      </span>\
       ${statusBadge(job.status)}\
       <span>\
         Submitted ${dateTime(job.submittedAt)}\
@@ -394,9 +374,7 @@ export async function jobDetailsPage(jobId) {
   </div>\
   <div class="detail-actions">\
     ${action}\
-    <button class="button button-outline button-small" data-action="copy-job" data-id="${esc(job.id)}">\
-      Copy print number\
-    </button>\
+    ${collectionAction}\
   </div>\
 </div>\
 <div class="detail-layout">\
@@ -446,41 +424,18 @@ export async function jobDetailsPage(jobId) {
           ${esc(job.notes || "No additional notes provided.")}\
         </p>\
       </div>\
-      ${job.status === "COMPLETED" ? `<div class="pickup-box">\
-  <span>\
-    Pickup location\
-  </span>\
-  <strong>\
-    ${esc(job.pickupLocation || "Not recorded")}\
-  </strong>\
-  <small>\
-    Completed ${job.completedAt ? dateTime(job.completedAt) : ""}\
-  </small>\
-</div>` : ""}\
+      ${pickupDetails(job)}\
+      ${job.status === "COMPLETED" ? `<details class="pickup-editor"><summary>Edit pickup details</summary><form data-form="job-pickup-update" data-id="${esc(job.id)}">
+        <label class="field"><span>Pickup location</span><input name="pickupLocation" value="${esc(job.pickupLocation || "")}" maxlength="120" placeholder="Enter the approved collection location" required /></label>
+        <label class="field"><span>Pickup instructions</span><textarea name="pickupInstructions" maxlength="500" rows="3">${esc(job.pickupInstructions || "")}</textarea></label>
+        <button type="submit" class="button button-outline button-small">Save pickup details</button>
+      </form></details>` : ""}\
     </section>\
     ${reassignForm}\
     ${notificationRows}\
   </div>\
   <aside class="detail-aside">\
-    <section class="detail-section">\
-      <h2>\
-        Job history\
-      </h2>\
-      <div class="timeline">\
-        ${[...job.history].reverse().map((event) => `<div class="timeline-event">\
-  <i>\
-  </i>\
-  <div>\
-    <strong>\
-      ${historyLabel(event)}\
-    </strong>\
-    <small>\
-      ${esc(event.assignedTo ? `${event.by} → ${event.assignedTo}` : event.by)} · ${dateTime(event.at)}\
-    </small>\
-  </div>\
-</div>`).join("")}\
-      </div>\
-    </section>\
+    ${jobProgress(job)}\
     <div class="detail-help">\
       <span>\
         ⓘ\

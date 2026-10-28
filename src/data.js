@@ -26,7 +26,7 @@ export const MATERIALS = [
 ];
 
 export const LAYER_HEIGHTS = ["0.12 mm", "0.20 mm", "0.28 mm"];
-export const STATUSES = ["SUBMITTED", "IN_PROGRESS", "PRINTING", "COMPLETED"];
+export const STATUSES = ["SUBMITTED", "APPROVED", "IN_PROGRESS", "AWAITING_AUTHORIZATION", "AUTHORIZED", "PRINTING", "COMPLETED", "COLLECTED", "CANCELLED", "REJECTED"];
 
 const now = Date.now();
 const isoDaysAgo = (days, hours = 10) => {

@@ -191,7 +191,8 @@ class ModelPreview {
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x141815);
+    const previewBackground = getComputedStyle(document.documentElement).getPropertyValue("--preview-scene").trim() || "#141815";
+    this.scene.background = new THREE.Color(previewBackground);
     this.camera = new THREE.PerspectiveCamera(38, width / height, Math.max(0.0001, sphere.radius / 1000), sphere.radius * 100);
     const distance = sphere.radius / Math.sin(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 1.28;
     this.camera.position.set(distance * 0.85, distance * 0.72, distance);
@@ -200,7 +201,7 @@ class ModelPreview {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     this.renderer.setSize(width, height, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.setClearColor(0x141815, 1);
+    this.renderer.setClearColor(previewBackground, 1);
     this.scene.add(new THREE.HemisphereLight(0xeaf1e7, 0x303832, 2.1));
     const keyLight = new THREE.DirectionalLight(0xffffff, 2.25);
     keyLight.position.set(3, 5, 4);
@@ -226,6 +227,14 @@ class ModelPreview {
       this.renderer.render(this.scene, this.camera);
     };
     animate();
+  }
+
+  syncAppearance() {
+    if (this.disposed || !this.renderer || !this.scene || !this.camera) return;
+    const background = getComputedStyle(document.documentElement).getPropertyValue("--preview-scene").trim() || "#141815";
+    this.scene.background = new THREE.Color(background);
+    this.renderer.setClearColor(background, 1);
+    this.renderer.render(this.scene, this.camera);
   }
 
   resize() {
@@ -258,6 +267,10 @@ class ModelPreview {
     this.cleanupResources();
     this.container.replaceChildren();
   }
+}
+
+export function syncPreviewAppearance() {
+  activePreview?.syncAppearance();
 }
 
 export function disposeModelPreview() {

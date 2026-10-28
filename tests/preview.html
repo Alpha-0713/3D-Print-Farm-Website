@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Print Farm visual QA fixtures</title>
+<style>body{font:16px system-ui;max-width:720px;margin:80px auto;padding:24px;line-height:1.6}button{font:inherit;padding:12px 18px;cursor:pointer}</style>
+<h1>Print Farm visual QA</h1>
+<p>This creates synthetic requests in a separate QA origin. Use <strong>localhost:8030</strong>; your normal preview at 127.0.0.1:8030 stays separate. The current QA state is backed up in session storage.</p>
+<button id="seed">Load visual test requests</button> <button id="restore">Restore previous QA data</button>
+<p><a href="./palette-preview.html">Open the filament palette preview</a> after loading the test requests.</p>
+<p id="message" role="status"></p>
+<script type="module">
+import { paletteFixtures } from "./paletteFixtures.js?v=2.2&rev=5";
+const keys = ["three-d-print-farm-demo-v3", "three-d-print-farm-demo-role", "three-d-print-farm-demo-accounts", "three-d-print-farm-draft-v2", "three-d-print-farm-theme", "three-d-print-farm-accent", "three-d-print-farm-glass-transparency"];
+const backupKey = "printfarm-qa-backup";
+document.querySelector("#seed").onclick = () => {
+  if (location.hostname !== "localhost") { document.querySelector("#message").textContent = "Use localhost for this isolated QA fixture."; return; }
+  if (!sessionStorage.getItem(backupKey)) sessionStorage.setItem(backupKey, JSON.stringify(keys.map((key) => [key, localStorage.getItem(key)])));
+  const base = { submitterId: "demo-person-01", submitterName: "Mr. Q", submitterEmail: "mr.q@example.com", recipientEmail: "mr.q@example.com", fileName: "sensor-mount.stl", fileSize: "1.4 MB", material: "PLA", color: "Ocean blue", purpose: "Class project", notes: "Keep the mounting face flat. Thank you!", layerHeight: "0.20 mm", infill: 20, submittedAt: "2026-10-23T15:00:00Z", assignedStaff: "Leddy Tiang" };
+  const types = ["SUBMITTED", "CLAIMED", "PRINTING", "COMPLETED", "COLLECTED"];
+  const titles = ["Sensor mount · Rev C", "Camera bracket · Rev A", "Enclosure base · Rev B", "Display stand · Rev A", "Cable guide · Rev D", "Early prototype · Rev A", "Model study · Rev B"];
+  const jobs = ["COMPLETED", "IN_PROGRESS", "PRINTING", "COLLECTED", "SUBMITTED", "CANCELLED", "REJECTED"].map((status, index) => {
+    const last = ["SUBMITTED", "IN_PROGRESS", "PRINTING", "COMPLETED", "COLLECTED"].indexOf(status);
+    const history = types.slice(0, last < 0 ? 1 : last + 1).map((type, step) => ({ type, at: `2026-10-${23 + step}T15:00:00Z`, by: step === 0 ? "Mr. Q" : "Leddy Tiang" }));
+    if (last < 0) history.push({ type: status, at: "2026-10-24T15:00:00Z", by: "Leddy Tiang" });
+    return { ...base, id: `QA-${index}`, projectName: titles[index], status, history, assignedStaff: status === "SUBMITTED" ? null : "Leddy Tiang", ...(["COMPLETED", "COLLECTED"].includes(status) ? { pickupLocation: "Test collection desk · QA fixture", pickupInstructions: "Ask the staff member at the collection desk. Bring your project name.", completedAt: "2026-10-26T15:00:00Z" } : {}), ...(status === "COLLECTED" ? { collectedAt: "2026-10-27T15:00:00Z" } : {}) };
+  });
+  localStorage.setItem(keys[0], JSON.stringify({ jobs, notifications: [], inventory: paletteFixtures, contributions: [], hours: { transactions: [], requests: [] } }));
+  localStorage.setItem(keys[1], "demo-person-01");
+  location.href = "../#/my-jobs";
+};
+document.querySelector("#restore").onclick = () => {
+  const saved = sessionStorage.getItem(backupKey);
+  if (saved) for (const [key, value] of JSON.parse(saved)) value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+  sessionStorage.removeItem(backupKey);
+  document.querySelector("#message").textContent = "Previous QA data restored.";
+};
+</script></html>

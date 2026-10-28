@@ -4,6 +4,8 @@ export const PERMISSIONS = Object.freeze({
   STAFF_DASHBOARD_VIEW: "staff_dashboard.view",
   JOBS_MANAGE: "jobs.manage",
   JOBS_REASSIGN: "jobs.reassign",
+  JOBS_APPROVE: "jobs.approve",
+  SUPERVISOR_PRESENCE: "supervisor.presence",
   CONTRIBUTIONS_MANAGE: "contributions.manage",
   FILAMENT_VIEW: "filament.view",
   FILAMENT_CHANGE: "filament.change",
@@ -47,7 +49,7 @@ export const ROLES = Object.freeze({
     title: "Print Farm Teacher",
     level: 4,
     inherits: ["senior_print_farm_member"],
-    permissions: [PERMISSIONS.JOBS_REASSIGN, PERMISSIONS.HOURS_ADMIN, PERMISSIONS.CONTRIBUTIONS_MANAGE],
+    permissions: [PERMISSIONS.JOBS_REASSIGN, PERMISSIONS.JOBS_APPROVE, PERMISSIONS.SUPERVISOR_PRESENCE, PERMISSIONS.HOURS_ADMIN, PERMISSIONS.CONTRIBUTIONS_MANAGE],
   }),
 });
 
@@ -73,6 +75,7 @@ export function hasPermission(roleId, permission) {
 export const ROUTE_PERMISSIONS = Object.freeze({
   "get-started": PERMISSIONS.PRINT_REQUEST_CREATE,
   "my-jobs": PERMISSIONS.MY_JOBS_VIEW,
+  "my-job": PERMISSIONS.MY_JOBS_VIEW,
   staff: PERMISSIONS.STAFF_DASHBOARD_VIEW,
   active: PERMISSIONS.STAFF_DASHBOARD_VIEW,
   materials: PERMISSIONS.STAFF_DASHBOARD_VIEW,
@@ -95,7 +98,14 @@ export const ACTION_PERMISSIONS = Object.freeze({
   "inventory-toggle": PERMISSIONS.FILAMENT_CHANGE,
   "inventory-low-stock-toggle": PERMISSIONS.FILAMENT_CHANGE,
   "inventory-delete": PERMISSIONS.FILAMENT_CHANGE,
+  "approve-job": PERMISSIONS.JOBS_APPROVE,
+  "reject-job": PERMISSIONS.JOBS_APPROVE,
+  "authorize-print": PERMISSIONS.JOBS_APPROVE,
+  "revise-print": PERMISSIONS.JOBS_APPROVE,
+  "request-authorization": PERMISSIONS.JOBS_MANAGE,
+  "toggle-presence": PERMISSIONS.SUPERVISOR_PRESENCE,
   "claim-job": PERMISSIONS.JOBS_MANAGE,
+  "collect-job": PERMISSIONS.JOBS_MANAGE,
   "start-printing": PERMISSIONS.JOBS_MANAGE,
   "complete-job": PERMISSIONS.JOBS_MANAGE,
   "retry-notification": PERMISSIONS.NOTIFICATIONS_RETRY,
@@ -104,7 +114,6 @@ export const ACTION_PERMISSIONS = Object.freeze({
   "hours-clear-filters": PERMISSIONS.STAFF_DASHBOARD_VIEW,
   "hours-approve": PERMISSIONS.HOURS_ADMIN,
   "hours-reject": PERMISSIONS.HOURS_ADMIN,
-  "copy-job": PERMISSIONS.STAFF_DASHBOARD_VIEW,
 });
 
 export const FORM_PERMISSIONS = Object.freeze({
@@ -115,9 +124,11 @@ export const FORM_PERMISSIONS = Object.freeze({
   "hours-admin-adjust": PERMISSIONS.HOURS_ADMIN,
   "hours-admin-filter": PERMISSIONS.HOURS_ADMIN,
   "inventory-add": PERMISSIONS.FILAMENT_CHANGE,
+  "inventory-update": PERMISSIONS.FILAMENT_CHANGE,
   "hours-add": PERMISSIONS.CONTRIBUTIONS_MANAGE,
   "hours-update": PERMISSIONS.CONTRIBUTIONS_MANAGE,
   "job-reassign": PERMISSIONS.JOBS_REASSIGN,
+  "job-pickup-update": PERMISSIONS.JOBS_MANAGE,
 });
 
 export const PERMISSION_LABELS = Object.freeze({
@@ -125,6 +136,8 @@ export const PERMISSION_LABELS = Object.freeze({
   [PERMISSIONS.MY_JOBS_VIEW]: "viewing your print requests",
   [PERMISSIONS.STAFF_DASHBOARD_VIEW]: "opening the Staff Dashboard",
   [PERMISSIONS.JOBS_MANAGE]: "managing print jobs",
+  [PERMISSIONS.JOBS_APPROVE]: "approving requests and authorizing prints",
+  [PERMISSIONS.SUPERVISOR_PRESENCE]: "updating your supervisor presence",
   [PERMISSIONS.JOBS_REASSIGN]: "reassigning print jobs",
   [PERMISSIONS.CONTRIBUTIONS_MANAGE]: "managing contribution records",
   [PERMISSIONS.FILAMENT_VIEW]: "viewing filament details",

@@ -1,4 +1,4 @@
-import { getRole, hasPermission } from "./authorization.js?v=20";
+import { getRole, hasPermission } from "./authorization.js?v=2.2&rev=5";
 
 export const DEMO_ROLE_STORAGE_KEY = "three-d-print-farm-demo-role";
 export const DEMO_ACCOUNTS_STORAGE_KEY = "three-d-print-farm-demo-accounts";
@@ -74,6 +74,10 @@ function activeRoleId() {
 
 export const authService = {
   mode: "demo",
+  resetSession() {
+    inMemoryIdentityId = DEFAULT_DEMO_IDENTITY_ID;
+    inMemoryCustomAccounts = [];
+  },
   getActiveRoleId: activeRoleId,
   getCurrentRole() {
     return getRole(activeRoleId());

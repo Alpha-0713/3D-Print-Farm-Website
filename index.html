@@ -3,31 +3,42 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#181818" />
+    <meta name="theme-color" content="#f5f5f7" />
     <script>
       (() => {
-        const accents = ["green", "blue", "purple", "teal", "orange", "rose"];
+        document.documentElement.dataset.accent = "monochrome";
+        const themes = ["light", "dark"];
         try {
-          const accent = localStorage.getItem("three-d-print-farm-accent");
-          document.documentElement.dataset.accent = accents.includes(accent) ? accent : "green";
+          const savedTheme = localStorage.getItem("three-d-print-farm-theme");
+          document.documentElement.dataset.theme = themes.includes(savedTheme)
+            ? savedTheme
+            : (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark");
+          document.querySelector('meta[name="theme-color"]').content =
+            document.documentElement.dataset.theme === "light" ? "#f5f5f7" : "#111112";
         } catch {
-          document.documentElement.dataset.accent = "green";
+          document.documentElement.dataset.accent = "monochrome";
+          document.documentElement.dataset.theme =
+            window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
         }
-        document.documentElement.dataset.theme = "dark";
       })();
     </script>
-    <meta name="description" content="School 3D Print Farm Website — v2.0.0 demo with a refined, accessible motion system, role-based access control, staff hours management, and filament availability." />
-    <meta name="version" content="v2.0.0" />
-    <title>School 3D Print Farm Website — v2.0.0</title>
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=20" />
-    <link rel="stylesheet" href="./src/styles.css?v=43" />
+    <meta name="description" content="School 3D Print Farm Website — v2.2 demo with a refined, accessible motion system, role-based access control, staff hours management, and filament availability." />
+    <meta name="version" content="v2.2" />
+    <title>School 3D Print Farm Website — v2.2</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=2.2&amp;rev=4" />
+    <link rel="stylesheet" href="./src/styles.css?v=2.2&amp;rev=9" />
     <script type="importmap">{
       "imports": {
+        "./src/pageShared.js?v=2.2&rev=5": "./src/pageShared.js?v=2.2&rev=6",
+        "./src/staffPages.js?v=2.2&rev=5": "./src/staffPages.js?v=2.2&rev=6",
+        "./src/personalInbox.js?v=2.2&rev=5": "./src/personalInbox.js?v=2.2&rev=6",
+        "./src/floatingControls.js?v=2.2&rev=5": "./src/floatingControls.js?v=2.2&rev=6",
+        "./src/pageCommit.js?v=2.2&rev=5": "./src/pageCommit.js?v=2.2&rev=6",
         "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
       }
     }</script>
-    <script type="module" src="./src/app.js?v=29"></script>
+    <script type="module" src="./src/app.js?v=2.2&amp;rev=6"></script>
   </head>
   <body>
     <div id="app"></div>

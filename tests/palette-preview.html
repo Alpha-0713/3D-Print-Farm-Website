@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-accent="monochrome">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Filament palette preview · v2.2</title><link rel="stylesheet" href="../src/styles.css?v=2.2&amp;rev=7">
+<style>.qa-banner{padding:12px 5%;border-bottom:1px solid var(--border);color:var(--muted);font:12px system-ui;background:var(--surface)}.qa-banner a{margin-left:18px;text-decoration:underline}.wizard-actions,.discard-draft,.local-data-controls,.role-switcher{display:none}</style></head>
+<body><div class="qa-banner">VISUAL QA · Sample inventory · Same components as the print request form<a href="./preview.html">Load sample colours</a><a href="../#/get-started">Open the website</a></div><div id="app"></div>
+<script type="module">
+import { syncFloatingControls } from "../src/floatingControls.js?v=2.2&rev=5";
+import { getStartedPage } from "../src/requestWizard.js?v=2.2&rev=5";
+import { applyFilamentSelection } from "../src/filamentPalette.js?v=2.2&rev=5";
+import { inventoryService } from "../src/services.js?v=2.2&rev=5";
+const state = { menuOpen: false, wizard: { step: 2, file: null, projectName: "", purpose: "Class project", notes: "", inventoryId: "", material: "", color: "", submittedJob: null } };
+const root = document.querySelector("#app");
+root.innerHTML = await getStartedPage(state);
+syncFloatingControls(root);
+for (const link of root.querySelectorAll('a[href^="#/"]')) link.setAttribute('href', '../' + link.getAttribute('href'));
+root.addEventListener("change", async (event) => {
+  if (event.target.matches('[name="inventoryId"]')) applyFilamentSelection(root, state.wizard, await inventoryService.getItem(event.target.value));
+});
+root.addEventListener("click", (event) => {
+  if (event.target.closest('[data-action="wizard-goto"]')) location.href = '../#/get-started';
+  const theme = event.target.closest('[data-action="set-theme"]');
+  if (theme) {
+    document.documentElement.dataset.theme = theme.dataset.theme;
+    document.querySelectorAll('[data-action="set-theme"]').forEach((button) => button.setAttribute('aria-pressed', String(button === theme)));
+  }
+  const menu = event.target.closest('[data-action="menu-toggle"]');
+  if (menu) { state.menuOpen = !state.menuOpen; menu.setAttribute('aria-expanded', String(state.menuOpen)); }
+});
+</script></body></html>

@@ -1,0 +1,80 @@
+<!doctype html><html lang="en" data-theme="dark" data-accent="monochrome"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sidebar regression checks · v2.2</title>
+<link rel="stylesheet" href="../src/styles.css?v=2.2&amp;rev=7">
+<style>.check-toolbar{padding:20px 28px;border-bottom:1px solid var(--border)}.check-toolbar h1{font-size:20px;margin:0 0 8px}.check-toolbar button{padding:10px 16px;background:var(--accent-primary);color:var(--accent-foreground);border:0;cursor:pointer}.check-toolbar a{margin-left:20px;text-decoration:underline}#results{font:13px system-ui;white-space:pre-wrap;line-height:1.7}.check-failed{color:var(--error)}</style>
+</head><body><div class="check-toolbar"><h1>Sidebar regression checks</h1><button id="run" disabled>Run checks</button><a href="../#/staff">Open the website</a><div id="results" role="status">Uses production staff components and DOM updates. No account or job data is changed.</div></div><div id="fixture"></div>
+<script type="module">
+import { staffShell } from "../src/staffPages.js?v=2.2&rev=5";
+import { commitPage } from "../src/pageCommit.js?v=2.2&rev=5";
+import { syncFloatingControls } from "../src/floatingControls.js?v=2.2&rev=5";
+import { syncSidebarSelection } from "../src/sidebarSelection.js?v=2.2&rev=5";
+const root = document.querySelector('#fixture');
+const results = document.querySelector('#results');
+const html = (active, copy = '') => staffShell(`<h1>Preview ${active}</h1><p>${copy || 'Navigation-only fixture. No work records are modified.'}</p>`, active);
+function render(active, copy = '') { const preserved = commitPage(root, html(active, copy)); syncSidebarSelection(root); syncFloatingControls(root); return preserved; }
+render('overview');
+root.addEventListener('click', (event) => {
+  const link = event.target.closest('.sidebar-link');
+  if (!link) return;
+  event.preventDefault();
+  render(({ '#/staff': 'overview', '#/staff/active': 'active', '#/staff/materials': 'materials', '#/staff/hours': 'hours' })[link.getAttribute('href')]);
+});
+document.querySelector('#run').addEventListener('click', async () => {
+  results.textContent = 'Running checks…';
+  window.scrollTo(0, 0);
+  // Let the Run button click finish before testing outside-click dismissal.
+  await new Promise(requestAnimationFrame);
+  const passed = [];
+  const check = (condition, label) => { if (!condition) throw new Error(label); passed.push(`PASS · ${label}`); };
+  try {
+    render('overview');
+    const shell = root.querySelector('.staff-app'), side = root.querySelector('.staff-sidebar'), marker = root.querySelector('.sidebar-selection'), nav = side.querySelector('nav'), controls = root.querySelector('.toolbar-controls'), profile = controls.querySelector('.role-switcher');
+    const link = side.querySelector('a[href="#/staff/active"]');
+    check(render('active'), 'Staff navigation reuses its shell');
+    check(root.querySelector('.staff-app') === shell && root.querySelector('.staff-sidebar') === side && root.querySelector('.sidebar-selection') === marker && root.querySelector('.toolbar-controls') === controls && root.querySelector('.role-switcher') === profile && marker.isConnected, 'Sidebar, highlight, and profile controls stay connected as the same DOM nodes');
+    check(root.querySelector('.staff-content h1').textContent === 'Preview active' && link.getAttribute('aria-current') === 'page', 'Page content and active tab update together');
+    check([...nav.querySelectorAll('.sidebar-link')].every((item) => getComputedStyle(item).backgroundImage === 'none' && getComputedStyle(item).backgroundColor === 'rgba(0, 0, 0, 0)'), 'No duplicate accent background is painted on the links');
+    check(!side.querySelector('.toolbar-controls') && controls.contains(profile) && controls.children[0].matches('.appearance-controls') && controls.children[1].matches('.role-switcher') && controls.children[2].matches('.inbox-picker'), 'Appearance, Identity, and Inbox share the top-right toolbar');
+    const animation = marker.getAnimations().find((item) => item.playState === 'running');
+    render('active', 'A routine data refresh');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) check(Boolean(animation) && marker.getAnimations().includes(animation), 'A data refresh preserves the in-flight animation');
+    for (let index=0; index<30; index++) {
+      render(['hours', 'overview', 'active'][index % 3]);
+      if (root.querySelector('.sidebar-selection') !== marker || !marker.isConnected || marker.getAnimations().filter((item) => item.playState === 'running').length > 1) throw new Error('Rapid navigation replaced the highlight or overlapped animations');
+    }
+    check(true, 'Thirty rapid tab changes retain one mounted highlight and at most one animation');
+    const updated = document.createElement('template'); updated.innerHTML = html('overview');
+    const updatedProfile = updated.content.querySelector('.role-switcher');
+    updatedProfile.dataset.profileSignature = 'qa-refreshed-accounts';
+    updatedProfile.querySelector('.role-option-name').textContent = 'Updated full profile name';
+    commitPage(root, updated.innerHTML); syncSidebarSelection(root); syncFloatingControls(root);
+    check(root.querySelector('.sidebar-selection') === marker && root.querySelector('.role-switcher') !== profile && root.querySelector('.role-option-name').textContent === 'Updated full profile name', 'Changed account choices refresh without replacing the sidebar or highlight');
+    render('overview');
+    const alternate = document.createElement('template'); alternate.innerHTML = html('overview'); alternate.content.querySelector('.staff-app').dataset.identityId = 'qa-different-identity';
+    check(commitPage(root, alternate.innerHTML) === false, 'An identity change rebuilds the shell instead of retaining old controls'); syncSidebarSelection(root);
+    check(!side.isConnected && marker.getAnimations().length === 0, 'Replaced navigation releases the previous animation');
+    commitPage(root, '<main><h1>Public page fixture</h1></main>'); syncSidebarSelection(root);
+    check(root.querySelector('.staff-sidebar') === null, 'Leaving staff pages removes staff navigation');
+    render('overview');
+    const row = root.querySelector('.toolbar-controls'), picker = row.querySelector('.role-switcher');
+    const initials = picker.querySelector('.role-trigger-initials').textContent;
+    const names = [...picker.querySelectorAll('.role-option-name')].map((item) => item.textContent);
+    check(!picker.querySelector('.role-trigger-name') && initials.trim().length > 0, 'Identity always shows initials with full names available in the menu');
+    check(getComputedStyle(picker.querySelector('summary')).width === '36px' && names.length > 0, 'Identity retains compact dimensions and all account choices');
+    const withinWindow = (menu) => {
+      const rect = menu.getBoundingClientRect();
+      return rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1;
+    };
+    const appearance = row.querySelector('.accent-picker');
+    appearance.querySelector('summary').click();
+    await new Promise(requestAnimationFrame);
+    check(appearance.open && withinWindow(appearance.querySelector('.appearance-panel')), 'Appearance opens inside the visible window');
+    picker.querySelector('summary').click();
+    await new Promise(requestAnimationFrame);
+    check(picker.open && !appearance.open && withinWindow(picker.querySelector('.role-switcher-menu')), 'Profile opens inside the window and closes the other menu');
+    picker.open = false;
+    results.className = ''; results.textContent = `${passed.length} checks passed\n` + passed.join('\n');
+  } catch (error) { results.className = 'check-failed'; results.textContent = passed.join('\n') + '\nFAIL · ' + error.message; }
+});
+document.querySelector("#run").disabled=false;
+</script></body></html>
