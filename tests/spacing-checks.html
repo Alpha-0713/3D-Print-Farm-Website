@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Complete spacing checks · v2.4</title><style>@import url("../src/fonts.css");
+body{margin:24px;font:14px/1.5 "Inter", Arial, sans-serif;background:#f5f5f7;color:#1d1d1f}h1{font-size:24px}button{padding:11px 22px;min-height:44px;border:0;border-radius:999px;background:#0066cc;color:white;font:inherit;cursor:pointer}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 "Inter", Arial, sans-serif}.failed{color:#a11}#viewport{overflow:auto;margin-top:20px}iframe{display:block;width:1440px;height:1000px;border:0;background:white}
+</style></head><body><h1>Complete spacing checks</h1><p>Checks actual request, student, staff, inventory, and hours pages at five widths in both themes. Creates one temporary filament and one model-link request so every detail screen is covered, even when the current inventory is empty. It uses no original file bytes and never fetches the model link. All application storage, including existing records and preferences, is backed up and restored afterward. Use a separate local QA origin.</p><button id="run">Run complete spacing checks</button><pre id="results" role="status">Ready.</pre><div id="viewport"><iframe id="app-frame" title="Production pages under spacing checks"></iframe></div>
+<script type="module">
+import { authService } from '../src/authService.js?v=2.2&rev=5';
+import { jobsService, inventoryService, LOCAL_DATA_KEYS } from '../src/services.js?v=2.2&rev=5';
+const frame=document.querySelector('iframe'), results=document.querySelector('#results'), run=document.querySelector('#run');
+const widths=[1440,1024,768,390,320], passed=[];
+const doc=()=>frame.contentDocument, win=()=>frame.contentWindow, style=e=>win().getComputedStyle(e);
+const visible=e=>{
+ if(!e||!e.getClientRects().length)return false;
+ for(let ancestor=e;ancestor;ancestor=ancestor.parentElement){
+  const appearance=style(ancestor);
+  if(appearance.visibility==='hidden'||appearance.display==='none'||appearance.opacity==='0')return false;
+  if(ancestor.tagName==='DETAILS'&&!ancestor.open&&!ancestor.querySelector(':scope > summary')?.contains(e))return false;
+ }
+ return true;
+};
+const check=(ok,label)=>{if(!ok)throw new Error(label);passed.push('PASS · '+label);results.textContent=passed.join('\n');};
+async function until(fn,label){const deadline=Date.now()+20000;while(Date.now()<deadline){if(fn())return;await new Promise(r=>setTimeout(r,35));}throw new Error('Timed out: '+label);}
+const settle=async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await new Promise(r=>setTimeout(r,100));};
+let loadedIdentity='';
+async function route(item,theme){
+  if(loadedIdentity!==item.identity){authService.switchRole(item.identity);frame.src='../index.html?spacing-check=2#'+item.hash;loadedIdentity=item.identity;}
+  else win().location.hash='#'+item.hash;
+  await until(()=>doc()?.querySelector(item.selector)&&(!item.identity.startsWith('demo-person-0')||!item.hash.startsWith('/staff')||doc().querySelector('.staff-app')?.dataset.identityId===item.identity),item.label);
+  await until(()=>!item.heading||doc().querySelector('h1')?.textContent.trim()===item.heading,item.label+' heading');
+  doc().documentElement.dataset.theme=theme;
+  await settle();
+}
+function assertSpacing(item,theme,width){
+ const label=theme+' '+width+'px '+item.label, d=doc(), viewport=win().innerWidth;
+ const overflow=d.documentElement.scrollWidth-viewport;
+ const overflowers=overflow>1?[...d.querySelectorAll('body *')].filter(visible).filter(e=>e.getBoundingClientRect().right>viewport+1).slice(0,3).map(e=>e.tagName+'.'+e.className).join(', '):'';
+ check(overflow<=1,label+' fits the document'+(overflowers?' ('+overflowers+')':''));
+ const controls=[...d.querySelectorAll('.field input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]), .field select, .field textarea')].filter(visible);
+ const short=controls.find(e=>e.getBoundingClientRect().height<43.5);
+ check(!short,label+' visible form controls have at least 44px height'+(short?' ('+(short.name||short.type)+': '+short.getBoundingClientRect().height+'px)':''));
+ const smallGaps=controls.filter(e=>{const field=e.closest('.field'),name=field?.querySelector(':scope > span');return name&&visible(name)&&e.getBoundingClientRect().top-name.getBoundingClientRect().bottom<5.5;});
+ check(!smallGaps.length,label+' labels have breathing room above controls'+(smallGaps.length?' ('+smallGaps.map(e=>e.name).join(', ')+')':''));
+ const cards=[...d.querySelectorAll('.staff-section,.detail-section,.filament-panel,.materials-inventory,.form-card,.aside-card,.job-progress,.pickup-details')].filter(visible);
+ const cramped=[];
+ for(const card of cards){const head=card.querySelector(':scope > .staff-section-head h2, :scope > .staff-section-head h3, :scope > .materials-inventory-head h2, :scope > .form-section-head h2, :scope > h2');if(!head||!visible(head))continue;const cr=card.getBoundingClientRect(),hr=head.getBoundingClientRect(),minimum=width<=767?15.5:17.5;if(hr.top-cr.top<minimum||hr.left-cr.left<minimum)cramped.push(head.textContent.trim()+' top '+Math.round(hr.top-cr.top)+'px / left '+Math.round(hr.left-cr.left)+'px');}
+ check(!cramped.length,label+' card headings have comfortable top and side insets'+(cramped.length?' ('+cramped.join('; ')+')':''));
+ const badHeadings=[...d.querySelectorAll('h1,h2,h3')].filter(visible).filter(e=>e.clientWidth>0&&e.scrollWidth>e.clientWidth+1);
+ check(!badHeadings.length,label+' headings wrap without horizontal clipping'+(badHeadings.length?' ('+badHeadings.map(e=>e.textContent.trim()).join('; ')+')':''));
+ const outside=cards.filter(card=>{const parent=card.closest('.staff-content,main'),a=card.getBoundingClientRect(),b=parent?.getBoundingClientRect();return b&&(a.left<b.left-1||a.right>b.right+1);});
+ check(!outside.length,label+' cards stay within their content region');
+ const hoursCard=d.querySelector('.hours-request-form-section');
+ if(hoursCard&&visible(hoursCard)){
+  const form=hoursCard.querySelector(':scope > .hours-request-form'),head=hoursCard.querySelector(':scope > .staff-section-head');
+  check(form&&head,label+' hours heading and form share one outer card');
+  const formStyle=style(form),cardStyle=style(hoursCard);
+  check(['borderTopLeftRadius','borderTopRightRadius','borderBottomLeftRadius','borderBottomRightRadius'].every(key=>parseFloat(formStyle[key])===0)&&['borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth'].every(key=>parseFloat(formStyle[key])===0),label+' hours form has a straight unframed inner seam');
+  check(parseFloat(cardStyle.borderTopLeftRadius)===18&&parseFloat(cardStyle.borderTopRightRadius)===18,label+' hours panel keeps only its rounded outer corners');
+  check(Math.abs(form.getBoundingClientRect().top-head.getBoundingClientRect().bottom)<=1,label+' hours heading and form meet at one clean divider');
+ }
+ const type=d.querySelector('.hours-request-form select[name="adjustmentType"]'),hours=d.querySelector('.hours-request-form input[name="hours"]');
+ if(type&&hours){const a=type.getBoundingClientRect(),b=hours.getBoundingClientRect();check(Math.abs(a.height-b.height)<=1,label+' Additional hours selector matches the hours input height');if(width>640&&Math.abs(a.left-b.left)>20)check(Math.abs(a.top-b.top)<=1,label+' hours controls align on the same row');}
+}
+run.onclick=async()=>{
+ run.disabled=true;passed.length=0;loadedIdentity='';results.className='';results.textContent='Preparing layout checks…';
+ const backup=Object.fromEntries(LOCAL_DATA_KEYS.map(key=>[key,localStorage.getItem(key)]));const previousIdentity=authService.getCurrentIdentity().id;
+ sessionStorage.setItem('printfarm-spacing-qa-backup',JSON.stringify(backup));
+ try{
+  authService.switchRole('demo-person-03');
+  const fixtureColour='Spacing fixture graphite '+crypto.randomUUID().slice(0,8);
+  const filament=await inventoryService.add({material:'PLA',color:fixtureColour,hexColor:'#545454'});
+  authService.switchRole('demo-person-01');
+  let job=await jobsService.createJob({submissionKey:crypto.randomUUID(),
+    projectName:'Spacing review · Extended classroom mounting bracket and enclosure prototype',
+    modelUrl:'https://example.com/spacing-fixture.stl',
+    inventoryId:filament.id,material:filament.material,color:filament.color,
+    purpose:'Class project',notes:'Temporary layout fixture with extended notes to check readable wrapping and consistent panel spacing. This record is restored away after the checks.'
+  });
+  authService.switchRole('demo-person-04');
+  await jobsService.reviewRequest(job.id,'approved');
+  authService.switchRole('demo-person-02');
+  job=await jobsService.claimJob(job.id);
+  check(filament.available&&filament.hexColor==='#545454'&&job.status==='IN_PROGRESS'&&job.attachments.length===0,'Temporary verified filament and assigned model-link request cover all detail screens without original file storage');
+  const routes=[
+   {identity:'demo-person-01',hash:'/get-started',selector:'.get-started',heading:'Get started.',label:'request form'},
+   {identity:'demo-person-01',hash:'/my-jobs',selector:'.my-jobs',heading:'My Print Jobs',label:'student requests'},
+   {identity:'demo-person-01',hash:'/my-jobs/'+encodeURIComponent(job.id),selector:'.submitter-detail',heading:job.projectName,label:'student request details'},
+   {identity:'demo-person-02',hash:'/staff',selector:'.overview-job-table,.overview-empty',heading:'Overview',label:'staff overview'},
+   {identity:'demo-person-02',hash:'/staff/active',selector:'.active-jobs-grid,.staff-content .empty-state',heading:'My active jobs',label:'assigned jobs'},
+   {identity:'demo-person-02',hash:'/staff/materials',selector:'.materials-inventory',heading:'Materials',label:'material availability'},
+   {identity:'demo-person-02',hash:'/staff/jobs/'+encodeURIComponent(job.id),selector:'.detail-section',heading:job.projectName,label:'Request overview and job details'},
+   {identity:'demo-person-02',hash:'/staff/hours',selector:'.hours-request-form',heading:'Hours',label:'personal hours and Additional hours selector'},
+   {identity:'demo-person-03',hash:'/staff/materials/new',selector:'[data-form="inventory-add"]',heading:'Add New Filament',label:'add filament form'},
+   {identity:'demo-person-03',hash:'/staff/materials/'+encodeURIComponent(filament.id),selector:'[data-form="inventory-update"]',heading:filament.material+' · '+filament.color,label:'edit filament form'},
+   {identity:'demo-person-04',hash:'/staff/hours',selector:'.hours-admin-staff-section',heading:'Hours',label:'supervisor hours overview'},
+   {identity:'demo-person-04',hash:'/staff/hours/staff/demo-person-02',selector:'.hours-staff-detail',heading:'Hours',label:'staff hour adjustments'}
+  ];
+  for(const theme of ['light','dark']){
+   localStorage.setItem('three-d-print-farm-theme',theme);localStorage.setItem('three-d-print-farm-sidebar-collapsed','false');
+   for(const width of widths){frame.style.width=width+'px';for(const item of routes){await route(item,theme);assertSpacing(item,theme,width);if(item.hash.includes('/staff/hours/staff/')){const more=doc().querySelector('.hours-correction-details');if(more&&!more.open){more.querySelector('summary').click();await settle();assertSpacing({...item,label:'expanded subtract-hours form'},theme,width);}}}}
+  }
+  results.textContent=passed.length+' spacing checks passed\n'+passed.join('\n');
+ }catch(error){results.className='failed';results.textContent=passed.join('\n')+'\nFAIL · '+error.message;console.error(error);}
+ finally{frame.src='about:blank';authService.switchRole(previousIdentity);for(const[key,value]of Object.entries(backup)){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}sessionStorage.removeItem('printfarm-spacing-qa-backup');frame.style.width='1440px';run.disabled=false;}
+};
+</script></body></html>

@@ -15,7 +15,7 @@
  --accent-tint:color-mix(in srgb,var(--accent-primary) 7%,transparent); --preview-scene:#121214;
  --accent-border:color-mix(in srgb,var(--accent-primary) 24%,transparent); --focus-ring:var(--accent-primary);
  --lime:var(--accent-primary); --lime-soft:var(--accent-active);
- --page:1380px; --font:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+ --page:1380px; --font:"Inter", Arial, sans-serif;
 }
 
 /* v2.2 shared geometry: user-confirmed 12px radius for every rounded surface. */
@@ -898,7 +898,7 @@ option { color:var(--text); background:var(--surface); }
 .material-values { display:flex; flex-wrap:wrap; gap:8px 18px; }
 .material-value { min-width:110px; display:flex; flex-direction:column; gap:2px; }
 .material-value > span { color:var(--muted); font-size: var(--text-caption); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-label); text-transform:uppercase; }
-.material-value code { color:var(--text-secondary); font:11px ui-monospace,SFMono-Regular,Menlo,monospace; }
+.material-value code { color:var(--text-secondary); font:11px "Inter", Arial, sans-serif; }
 .filament-controls, .filament-readonly-status { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding-top:12px; border-top:1px solid var(--border); }
 .filament-control-toggle { min-height:36px; padding:5px 10px; display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border-strong); border-radius: var(--radius-control); color:var(--text-secondary); background:var(--surface-soft); font-size: var(--text-caption); cursor:pointer; }
 .filament-control-toggle span { font-weight: var(--weight-semibold); }
@@ -912,7 +912,7 @@ option { color:var(--text); background:var(--surface); }
 .filament-status-label.is-low-stock { border-color:var(--warning-border); color:var(--warning-ink); background:var(--warning-bg); }
 .filament-status-label.is-available { border-color:var(--success-border); color:var(--success-ink); background:var(--success-bg); }
 .filament-status-label.is-unavailable { border-color:var(--error-border); color:var(--error-ink); background:var(--error-bg); }
-.color-input-preview { min-height:41px; padding:10px 12px; display:flex; align-items:center; gap:9px; border:1px solid var(--border); background:var(--surface-soft); color:var(--text-secondary); font:11px ui-monospace,SFMono-Regular,Menlo,monospace; }
+.color-input-preview { min-height:41px; padding:10px 12px; display:flex; align-items:center; gap:9px; border:1px solid var(--border); background:var(--surface-soft); color:var(--text-secondary); font:11px "Inter", Arial, sans-serif; }
 .color-input-swatch { width:24px; height:24px; flex:0 0 24px; border:1px solid var(--border-strong); border-radius: var(--radius-small); background:var(--filament-color,transparent); }
 .inventory-default-status { grid-column:1 / -1; margin:-4px 0 0; color:var(--muted); font-size: var(--text-caption); }
 .request-filament-status { margin:8px 0; display:flex; flex-wrap:wrap; gap:7px; }
@@ -2259,3 +2259,11 @@ body:has(#toast-root:not(:empty)) #inbox-toast-root { bottom: calc(var(--shell-i
 @media (max-width: 1024px) {
   .job-file-row { align-items: flex-start; flex-direction: column; }
 }
+
+/* Existing surfaces and spacing are reused for service status and the full job list. */
+#service-loading { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 100; padding: .5rem 1rem; border-radius: 12px; background: var(--surface-main); color: var(--text-primary); box-shadow: 0 2px 18px #0002; }
+.storage-recovery { padding: 1rem; margin: 1rem; border: 1px solid var(--border-color, #999); border-radius: 12px; background: var(--surface-main); }
+.job-list-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-bottom: 1.5rem; }
+.job-list-filters .field { flex: 1 1 160px; }
+.jobs-pagination { display: flex; gap: 1rem; margin-top: 1rem; }
+.session-account { font-size: .8rem; padding: .5rem; }

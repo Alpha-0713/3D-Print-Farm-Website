@@ -1,0 +1,563 @@
+/* v2.4 — shared interface, adapted from DESIGN-apple.md. */
+:root,
+:root[data-theme="light"],
+:root[data-theme="light"][data-accent] {
+  color-scheme: light;
+  --apple-blue: #0066cc;
+  --apple-blue-focus: #0071e3;
+  --apple-blue-dark: #2997ff;
+  --apple-ink: #1d1d1f;
+  --apple-paper: #ffffff;
+  --apple-parchment: #f5f5f7;
+  --apple-pearl: #fafafc;
+  --apple-dark: #272729;
+  --apple-dark-2: #2a2a2c;
+  --apple-dark-3: #252527;
+  --apple-hairline: #e0e0e0;
+  --apple-display-font: "Inter", Arial, sans-serif;
+  --apple-text-font: "Inter", Arial, sans-serif;
+  --font: var(--apple-text-font);
+  --bg: var(--apple-parchment);
+  --surface-main: rgb(255, 255, 255);
+  --surface: var(--surface-main);
+  --surface-soft: var(--apple-parchment);
+  --surface-raised: var(--apple-paper);
+  --surface-hover: #ededf0;
+  --surface-emphasis: #e8e8ed;
+  --surface-deep: var(--apple-parchment);
+  --surface-glass: var(--apple-paper);
+  --surface-overlay: rgb(245 245 247 / .94);
+  --header-bg: var(--apple-paper);
+  --header-border: var(--apple-hairline);
+  --hover-overlay: rgb(0 0 0 / .025);
+  --text: var(--apple-ink);
+  --text-strong: var(--apple-ink);
+  --text-secondary: #515154;
+  --muted: #6e6e73;
+  --quiet: #6e6e73;
+  --border: var(--apple-hairline);
+  --border-subtle: #ebebef;
+  --border-strong: #b9b9bf;
+  --control-bg: var(--apple-paper);
+  --button-strong-bg: var(--apple-ink);
+  --button-strong-hover: #333333;
+  --button-strong-fg: var(--apple-paper);
+  --action-fill: var(--apple-blue);
+  --accent-primary: var(--apple-blue);
+  --accent-hover: var(--apple-blue);
+  --accent-active: var(--apple-blue);
+  --accent-foreground: var(--apple-paper);
+  --accent-light: var(--apple-blue);
+  --accent-light-hover: var(--apple-blue);
+  --accent-light-active: var(--apple-blue);
+  --accent-tint: #eef5fc;
+  --accent-border: #b8d4f0;
+  --focus-ring: var(--apple-blue-focus);
+  --lime: var(--accent-primary);
+  --lime-soft: var(--accent-primary);
+  --preview-scene: #ededf0;
+  --success: #258246;
+  --success-bg: #f0f8f2;
+  --success-border: #bed9c5;
+  --success-ink: #24673a;
+  --warning: #9c6b0b;
+  --warning-bg: #fff8e9;
+  --warning-border: #e5d3aa;
+  --warning-ink: #805a10;
+  --error: #c0362c;
+  --error-bg: #fff2f0;
+  --error-border: #e9c0ba;
+  --error-ink: #ad3027;
+  --blue: var(--apple-blue);
+  --info-bg: #eef5fc;
+  --info-border: #bdd5ef;
+  --info-ink: #185c9f;
+  --glass-sidebar: var(--apple-parchment);
+  --glass-panel: var(--apple-parchment);
+  --glass-face: var(--apple-paper);
+  --glass-face-strong: var(--apple-paper);
+  --glass-edge: var(--apple-hairline);
+  --glass-edge-light: var(--border-strong);
+  --glass-highlight: transparent;
+  --glass-depth: transparent;
+  --glass-shadow: none;
+  --nav-selection: #e8eef5;
+  --nav-selection-border: transparent;
+  --radius: 8px;
+  --radius-panel: 18px;
+  --radius-control: 8px;
+  --radius-small: 8px;
+  --radius-pill: 9999px;
+  --radius-circle: 50%;
+  --text-caption: 12px;
+  --text-meta: 14px;
+  --text-button: 14px;
+  --text-body: 17px;
+  --text-nav: 14px;
+  --text-section: 21px;
+  --text-subheading: 24px;
+  --text-stat: 40px;
+  --text-title: 40px;
+  --text-marketing: 40px;
+  --text-display: 56px;
+  --weight-regular: 400;
+  --weight-medium: 600;
+  --weight-semibold: 600;
+  --line-heading: 1.1;
+  --line-compact: 1.3;
+  --line-body: 1.47;
+  --tracking-heading: -.025em;
+  --tracking-body: -.022em;
+  --tracking-label: .01em;
+  --page: 1440px;
+  --shell-inset: 20px;
+  --content-inset: clamp(20px, 3vw, 48px);
+  --panel-inset: 24px;
+  --content-gap: 12px;
+  --chrome-control-size: 44px;
+  --control-height: 44px;
+  --control-height-small: 44px;
+  --toolbar-height: 84px;
+  --sidebar-label-size: 14px;
+}
+
+:root[data-theme="dark"],
+:root[data-theme="dark"][data-accent] {
+  color-scheme: dark;
+  --bg: #161617;
+  --surface-main: rgb(37, 37, 39);
+  --surface: var(--surface-main);
+  --surface-soft: #1d1d1f;
+  --surface-raised: #2a2a2c;
+  --surface-hover: #343437;
+  --surface-emphasis: #3b3b3f;
+  --surface-deep: #161617;
+  --surface-glass: #252527;
+  --surface-overlay: rgb(29 29 31 / .94);
+  --header-bg: #1d1d1f;
+  --header-border: #3b3b3e;
+  --hover-overlay: rgb(255 255 255 / .04);
+  --text: #f5f5f7;
+  --text-strong: #ffffff;
+  --text-secondary: #cccccc;
+  --muted: #a1a1a6;
+  --quiet: #a1a1a6;
+  --border: #424245;
+  --border-subtle: #343437;
+  --border-strong: #67676c;
+  --control-bg: #1d1d1f;
+  --button-strong-bg: #f5f5f7;
+  --button-strong-hover: #ffffff;
+  --button-strong-fg: #1d1d1f;
+  --accent-primary: var(--apple-blue-dark);
+  --accent-hover: var(--apple-blue-dark);
+  --accent-active: var(--apple-blue-dark);
+  --accent-light: var(--apple-blue-dark);
+  --accent-light-hover: var(--apple-blue-dark);
+  --accent-light-active: var(--apple-blue-dark);
+  --accent-tint: #172b40;
+  --accent-border: #315b82;
+  --preview-scene: #1d1d1f;
+  --success: #81c995;
+  --success-bg: #1e3024;
+  --success-border: #3e6549;
+  --success-ink: #abd6b6;
+  --warning: #e6bd69;
+  --warning-bg: #332c1e;
+  --warning-border: #6c5934;
+  --warning-ink: #e8c482;
+  --error: #f08a80;
+  --error-bg: #382321;
+  --error-border: #75483f;
+  --error-ink: #f4aaa3;
+  --blue: var(--apple-blue-dark);
+  --info-bg: #1a2d40;
+  --info-border: #385d7d;
+  --info-ink: #a6cbed;
+  --glass-sidebar: #1d1d1f;
+  --glass-panel: #1d1d1f;
+  --glass-face: #252527;
+  --glass-face-strong: #252527;
+  --glass-edge: #424245;
+  --glass-edge-light: #67676c;
+  --nav-selection: #263747;
+}
+
+html { scroll-padding-top: 112px; }
+body { font-family: var(--apple-text-font); font-size: 17px; font-weight: 400; line-height: 1.47; letter-spacing: -.022em; background: var(--bg); background-image: none; }
+h1, h2, h3, h4 { font-family: var(--apple-display-font); font-weight: 600; }
+button, input, select, textarea { font-family: inherit; }
+button { touch-action: manipulation; }
+strong, b { font-weight: 600; }
+button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+html .button { min-height: 44px; padding: 11px 22px; border-radius: var(--radius-pill); font-size: 17px; font-weight: 400; line-height: 1.2; gap: 12px; box-shadow: none !important; background-image: none !important; }
+html .button-small, html .staff-app .button-small { min-height: 44px; padding: 10px 18px; font-size: 14px; }
+html .button-lime, html .button-lime:hover, html .button-lime:active { color: #ffffff; background: var(--action-fill); border-color: transparent; }
+html .button-outline, html .button-dark-outline,
+html .button-outline:hover, html .button-dark-outline:hover { color: var(--accent-primary); border: 1px solid var(--accent-primary); background: transparent; background-color: transparent !important; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html .button-dark { background: var(--button-strong-bg); color: var(--button-strong-fg); }
+html .button:active, html .button:active:hover, html button:not(:disabled):active { transform: scale(.95); }
+html .button:disabled, html button:disabled { opacity: .5; }
+html :is(.text-link, .table-action, .detail-back a, .request-row-action, .filament-edit-link, .edit-review, .inbox-back, .back-public) { color: var(--accent-primary); }
+html .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .025em; line-height: 1.4; }
+
+/* Flat utility surfaces. Product artwork and material swatches are left intact. */
+html :is(.aside-card, .filament-panel, .wizard-panel, .form-card, .job-card, .confirmation-panel,
+.active-job-card, .detail-section, .staff-section, .materials-inventory, .filament-inventory-card,
+.metric-card, .hours-summary-grid article, .hours-balance-card, .hours-overview-stat,
+.hours-request-card, .hours-transaction-card, .hours-activity-card, .hours-admin-personal,
+.job-progress, .pickup-details, .student-total-grid article, .completion-dialog, .empty-state) {
+  border-radius: 18px;
+  background: var(--surface);
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html :is(.review-card, .notes-box, .detail-file, .material-choice-detail, .pickup-box, .email-preview,
+.staff-note, .detail-help, .hours-give-panel, .hours-correction-details, .inventory-banner,
+.workflow-reason, .file-drop, .selected-file, .color-input-preview, .material-detail-color,
+.model-preview, .model-preview-message, .job-model-preview, .demo-identity, .hours-proposed-balance > span) {
+  background-image: none !important;
+  box-shadow: none !important;
+  border-radius: 8px;
+}
+html :is(.file-drop, .model-preview, .job-model-preview) { background: var(--surface-soft); }
+html :is(.role-switcher-menu, .accent-options, .inbox-panel, .completion-dialog, .inbox-toast, .toast) {
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html :is(.role-switcher-menu, .accent-options, .inbox-panel) { background-color: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 20px; }
+html :is(.role-switcher-option, .menu-toggle)::before { display: none; }
+html .toolbar-controls :is(.accent-picker, .role-switcher, .inbox-picker) > summary {
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 50%;
+  background: var(--surface-soft); background-image: none !important; border: 0;
+  box-shadow: none !important; color: var(--text-secondary); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html .toolbar-controls :is(.accent-picker, .role-switcher, .inbox-picker)[open] > summary,
+html .toolbar-controls :is(.accent-picker, .role-switcher, .inbox-picker) > summary:hover { background: var(--surface-hover); color: var(--accent-primary); }
+html .role-switcher-copy .role-trigger-initials { color: inherit; font-size: 14px; font-weight: 600; }
+html .role-switcher-option { min-height: 64px; padding: 12px; border-radius: 8px; }
+html .role-switcher-option[aria-pressed="true"] { border-color: var(--accent-border); background: var(--accent-tint); }
+html .role-option-name { font-size: 14px; }
+html .role-option-role, html .role-option-level { font-size: 12px; }
+html .role-switcher-menu > p { margin-top: 16px; padding-top: 16px; }
+html .theme-choice { min-height: 44px; border-radius: 9999px; background: var(--surface-soft); font-size: 14px; font-weight: 400; }
+html .theme-choice[aria-pressed="true"] { border: 2px solid var(--accent-primary); background: var(--surface); color: var(--accent-primary); box-shadow: none; }
+html .appearance-section-heading { color: var(--text); font-size: 17px; text-transform: none; letter-spacing: -.02em; margin-bottom: 16px; }
+html .appearance-system-note { margin-top: 14px; }
+html .role-create-account-form .field :is(input:not([type=range]), select) { min-height: 44px; font-size: 17px; }
+html .inbox-dot { background: var(--accent-primary); }
+html .inbox-heading h2, html .inbox-detail h2 { font-size: 21px; font-weight: 600; }
+html .inbox-entry { padding: 18px 8px; border-radius: 8px; }
+html .inbox-entry strong, html .inbox-detail p { font-size: 14px; line-height: 1.47; }
+html .inbox-entry > span { font-size: 14px; }
+html .inbox-entry small { font-size: 12px; }
+html .inbox-back { color: var(--accent-primary); min-height: 44px; font-size: 14px; }
+html .inbox-toast { border-radius: 18px; background: var(--surface); padding: 24px; }
+html .toast { border-radius: 18px; }
+
+/* Forms and request configuration. */
+html .page-shell { width: min(1200px, calc(100% - 64px)); }
+html .get-started, html .my-jobs { padding-top: 64px; padding-bottom: 80px; }
+html .wizard-layout { grid-template-columns: minmax(0, 1.5fr) minmax(280px, .85fr); gap: 32px; }
+html .wizard-heading { margin-bottom: 32px; }
+html .wizard-heading h1, html .page-title-row h1 { font-size: 40px; line-height: 1.1; font-weight: 600; letter-spacing: -.025em; margin: 12px 0; }
+html .wizard-heading p, html .page-title-row p { font-size: 17px; line-height: 1.47; }
+html .wizard-steps { margin-bottom: 24px; }
+html .wizard-step { min-height: 56px; font-size: 12px; }
+html .wizard-step b { font-weight: 400; }
+html .wizard-step.active b { font-weight: 600; }
+html .wizard-step span { width: 28px; height: 28px; font-size: 12px; }
+html .wizard-step::after { top: 22px; left: 38px; }
+html .form-card { padding: 32px; }
+html .form-section-head { gap: 16px; margin-bottom: 28px; }
+html .form-section-head h2 { font-size: 24px; line-height: 1.17; }
+html .form-section-head p { font-size: 14px; line-height: 1.47; margin-top: 8px; }
+html .file-drop { min-height: 224px; padding: 24px; border-color: var(--border-strong); }
+html .file-empty strong { font-size: 17px; font-weight: 600; }
+html .file-empty > span, html .file-empty .text-link { font-size: 14px; }
+html .file-empty small { font-size: 12px; }
+html .model-link-divider { margin: 24px 0; letter-spacing: .025em; }
+html .field, html .staff-app .field { gap: 8px; font-size: 14px; }
+html .field > span, html .staff-app .field > span { font-size: 14px; color: var(--text); }
+html .field input:not([type=range]), html .field select, html .field textarea,
+html .staff-app .field input:not([type=range]), html .staff-app .field select, html .staff-app .field textarea {
+  min-height: 48px; padding: 11px 14px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--control-bg); color: var(--text); font-size: 17px; line-height: 1.47; box-shadow: none;
+}
+html .field select, html .staff-app .field select { appearance: auto; background-image: none; padding-right: 12px; }
+html .field input[type="search"], html .staff-app .field input[type="search"] { border-radius: 9999px; padding-inline: 20px; }
+html .field textarea { min-height: 120px; }
+html .field input:not([type=range]):focus, html .field select:focus, html .field textarea:focus {
+  background: var(--control-bg); border-color: var(--apple-blue-focus); outline: 2px solid var(--apple-blue-focus); outline-offset: 2px;
+  box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html .field small, html .staff-app .field small { color: var(--muted); font-size: 12px; line-height: 1.47; }
+html .wizard-actions { margin-top: 24px; }
+html .wizard-aside { padding-top: 80px; }
+html .aside-card { padding: 24px; }
+html .preview-art { border-radius: 8px; height: 260px; }
+html .preview-card h2 { font-size: 21px; font-weight: 600; }
+html .summary-rows > div { padding-block: 14px; }
+html .summary-rows strong { font-size: 14px; }
+html .good-to-know { margin-top: 24px; }
+html .review-row { padding: 16px; grid-template-columns: 140px minmax(0, 1fr); }
+html .review-row span { font-size: 14px; }
+html .review-row strong { font-size: 14px; }
+html .edit-review { min-height: 44px; font-size: 14px; margin: 8px 16px; }
+html .confirmation-panel { min-height: 0; padding: 48px; }
+html .confirmation-panel h1 { font-size: 40px; line-height: 1.1; }
+html .palette-grid { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 24px 12px; }
+html .palette-colour-name, html .palette-availability { font-size: 12px; line-height: 1.47; }
+html .palette-selection .material-choice-detail { border-radius: 18px; background: var(--surface-soft); }
+html .palette-swatch { box-shadow: none; }
+html .palette-check { background: var(--action-fill); color: #ffffff; }
+
+/* Student views keep their existing filter and progress structure. */
+html .request-owner { padding-block: 24px; font-size: 14px; }
+html .request-filters { gap: 8px; border: 0; margin: 0 0 16px; }
+html .request-filters a { min-height: 44px; padding: 10px 16px; border: 1px solid var(--border); border-radius: 9999px; background: var(--surface); color: var(--text-secondary); font-size: 14px; }
+html .request-filters a[aria-current] { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--accent-tint); }
+html .request-list { border-radius: 18px; border: 1px solid var(--border); overflow: hidden; background: var(--surface); }
+html .request-row { padding: 28px 24px; grid-template-columns: minmax(0, 1fr) 210px 120px; }
+html .request-row:last-child { border-bottom: 0; }
+html .request-row h2 { font-size: 21px; font-weight: 600; line-height: 1.2; }
+html .request-row p { font-size: 14px; }
+html .request-row-action { font-size: 14px; }
+html .job-progress { padding: 24px; }
+html .request-specs h2, html .job-progress h2, html .pickup-details h2 { font-size: 24px; font-weight: 600; line-height: 1.17; }
+html .progress-stage strong { font-size: 17px; }
+html .progress-stage small { font-size: 12px; }
+html .progress-stage p { font-size: 14px; line-height: 1.47; }
+html .request-specs dd, html .pickup-details dd, html .request-notes p { font-size: 17px; line-height: 1.47; }
+html .request-notes h3 { font-size: 21px; }
+html .status, html .staff-app .status, html .hours-status { border-radius: 9999px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
+:root[data-theme] .status { border-color: var(--border); color: var(--text-secondary); background: var(--surface-soft); }
+:root[data-theme] :is(.status-submitted, .status-awaiting_authorization, .status-printing) { color: var(--warning-ink); border-color: var(--warning-border); background: var(--warning-bg); }
+:root[data-theme] :is(.status-approved, .status-authorized, .status-completed, .status-collected) { color: var(--success-ink); border-color: var(--success-border); background: var(--success-bg); }
+:root[data-theme] .status-in_progress { color: var(--info-ink); border-color: var(--info-border); background: var(--info-bg); }
+:root[data-theme] .status-rejected { color: var(--error-ink); border-color: var(--error-border); background: var(--error-bg); }
+:root[data-theme] .status-cancelled { color: var(--muted); border-color: var(--border); background: var(--surface-soft); }
+html .empty-state { border-style: solid; padding: 48px 24px; }
+html .empty-state h2, html .staff-app .empty-state h2 { font-size: 24px; font-weight: 600; }
+html .empty-state p, html .staff-app .empty-state p { max-width: 520px; font-size: 17px; line-height: 1.47; }
+html .demo-pill { border-radius: 9999px; font-size: 12px; padding: 6px 10px; }
+
+/* Staff workspaces: spacious utility cards with a quiet, persistent sidebar. */
+html .staff-app { background: var(--bg); font-size: 17px; --staff-space-1: 8px; --staff-space-2: 12px; --staff-space-3: 20px; --staff-space-4: 24px; --staff-space-5: 32px; --staff-space-6: 48px; }
+html .staff-sidebar { background: var(--glass-sidebar); border-color: var(--border); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html .sidebar-brand .brand span { font-size: 14px; font-weight: 600; letter-spacing: -.02em; }
+html .staff-sidebar .sidebar-link { font-size: 14px; }
+html .staff-sidebar .sidebar-link.selected, html .staff-sidebar .sidebar-link.selected > span { color: var(--accent-primary); }
+html .sidebar-selection::before { background: var(--nav-selection); background-image: none; border: 0; border-radius: 8px; box-shadow: none; }
+html .staff-sidebar .sidebar-link, html .staff-sidebar .sidebar-link:hover, html .staff-sidebar .sidebar-link.selected { background: transparent; box-shadow: none; }
+html .staff-toolbar { min-height: 84px; padding: 20px var(--content-inset); background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html .staff-app .staff-content { max-width: 1500px; width: 100%; margin-inline: auto; padding: 40px var(--content-inset) 56px; gap: 32px; }
+html .staff-app .staff-page-heading, html .staff-app .materials-page-top { align-items: center; gap: 24px; }
+html .staff-app :is(.staff-page-heading, .materials-page-top) > div { gap: 8px; }
+html .staff-app :is(.staff-page-heading, .materials-page-top) h1 { font-size: 40px; font-weight: 600; line-height: 1.1; margin: 0; letter-spacing: -.025em; }
+html .staff-app :is(.staff-page-heading, .materials-page-top) p { font-size: 17px; line-height: 1.47; }
+html .staff-app .metric-grid { gap: 20px; }
+html .staff-app .metric-card { padding: 24px; min-height: 156px; }
+html .staff-app .metric-card > div { font-size: 14px; }
+html .staff-app .metric-card > strong { margin-top: 16px; font-size: 40px; line-height: 1.1; font-weight: 600; }
+html .staff-app .metric-card > small { font-size: 12px; line-height: 1.47; }
+html .staff-app .staff-section-head { padding: 24px; align-items: center; gap: 20px; }
+html .staff-app .staff-section-head h2, html .staff-app .detail-section > h2 { font-size: 24px; font-weight: 600; line-height: 1.17; }
+html .staff-app .staff-section-head p { font-size: 14px; line-height: 1.47; margin-top: 8px; }
+html .staff-section .overview-job-table th { padding: 16px 24px; font-size: 12px; letter-spacing: .02em; background: var(--surface-soft); }
+html .staff-section .overview-job-table td { padding: 20px 24px; font-size: 14px; line-height: 1.47; }
+html .staff-section .overview-job-table td small { font-size: 12px; }
+html .table-project .table-project-name { font-size: 14px; font-weight: 600; }
+html .staff-app .table-action { font-size: 14px; font-weight: 400; }
+html .table-wrap, html .hours-table-wrap { border-radius: 0 0 18px 18px; }
+html .active-jobs-grid, html .materials-grid { gap: 20px; }
+html .active-job-card { padding: 24px; }
+html .active-job-card h2 { font-size: 24px; font-weight: 600; }
+html .active-job-card > p, html .staff-app .active-details { font-size: 14px; }
+html .staff-app .detail-section { padding: 24px; }
+html .staff-app .detail-section > .staff-section-head { margin-inline: -24px; padding-top: 0; }
+html .staff-app .detail-grid strong, html .staff-app .notes-box p, html .staff-app .pickup-box strong { font-size: 17px; font-weight: 400; line-height: 1.47; }
+html .staff-app .detail-grid span, html .staff-app .notes-box > span, html .staff-app .pickup-box > span { font-size: 12px; }
+html .materials-inventory-head { padding: 24px; }
+html .materials-inventory-head h2 { font-size: 24px; font-weight: 600; }
+html .materials-grid { padding: 24px; }
+html .filament-inventory-card { padding: 24px; background: var(--surface); }
+html .filament-inventory-title h3 { font-size: 21px; }
+html .material-value code { font-size: 12px; }
+html .filament-control-toggle, html .filament-delete-control { min-height: 44px; border-radius: 8px; font-size: 12px; background-image: none !important; box-shadow: none !important; }
+html .filament-status-label { border-radius: 9999px; font-size: 12px; }
+html .staff-app .inventory-add-form, html .staff-app .hours-filter-form, html .staff-app .hours-add-form,
+html .staff-app .hours-request-form, html .staff-app .hours-admin-adjust-form { gap: 24px; }
+html .hours-request-form, html .hours-admin-filter-form, html .hours-admin-adjust-form { border-radius: 18px; }
+html .hours-balance-card > strong { font-size: 48px; font-weight: 600; line-height: 1.1; }
+html .hours-overview-stat > strong { font-size: 40px; line-height: 1.1; }
+html .hours-staff-table th { font-size: 12px; }
+html .hours-staff-table td, html .hours-staff-table td strong { font-size: 14px; }
+html .hours-staff-table td small { font-size: 12px; }
+html .hours-activity-card, html .hours-request-card, html .hours-transaction-card { padding: 24px; }
+html .hours-request-reason, html .hours-transaction-card > p, html .hours-activity-card p { font-size: 14px; line-height: 1.47; }
+html .local-data-controls { padding-top: 24px; margin-top: 32px; }
+html .local-data-controls p { font-size: 12px; }
+html .local-data-controls button { font-size: 12px; }
+html .staff-main > .local-data-controls { margin: 0 var(--content-inset) 32px; }
+html .job-files-heading h2 { font-size: 24px; }
+html .job-file-name strong { font-size: 17px; font-weight: 600; }
+html .job-model-preview { border-radius: 8px; }
+
+@media (max-width: 1068px) {
+  html .page-shell { width: calc(100% - 48px); }
+  html .wizard-layout { grid-template-columns: minmax(0, 1.35fr) minmax(260px, .9fr); gap: 24px; }
+  html .form-card { padding: 24px; }
+  html .staff-app .staff-content { padding-top: 32px; gap: 24px; }
+  html .staff-app .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html .staff-app :is(.staff-page-heading, .materials-page-top) h1 { font-size: 34px; }
+}
+@media (max-width: 833px) {
+  html .wizard-layout { grid-template-columns: 1fr; }
+  html .wizard-aside { padding-top: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  html .wizard-aside .good-to-know { margin: 0; display: block; }
+  html .wizard-heading h1, html .page-title-row h1 { font-size: 34px; }
+  html .get-started, html .my-jobs { padding-top: 48px; padding-bottom: 64px; }
+  html .request-row { grid-template-columns: minmax(0, 1fr) 180px; gap: 16px; }
+  html .request-row-action { grid-column: 1 / -1; padding-top: 4px; }
+}
+@media (max-width: 767px) {
+  html .staff-sidebar { height: auto; padding-block: 20px 16px; }
+  html .staff-sidebar nav { gap: 4px; }
+  html .staff-toolbar { padding: 16px 20px; min-height: 76px; gap: 12px; }
+  html .staff-app .staff-content { padding: 28px 20px 40px; }
+  html .staff-app .staff-page-heading, html .staff-app .materials-page-top { align-items: flex-start; }
+  html .staff-app .staff-section-head { padding: 20px; }
+  html .staff-app .staff-section-head h2 { font-size: 21px; }
+  html .staff-app .metric-card { min-height: 140px; padding: 20px; }
+  html .staff-app .metric-card > strong { font-size: 34px; }
+  html .staff-app .staff-content .detail-section { padding: 20px; }
+  html .staff-app .detail-section > .staff-section-head { margin-inline: -20px; }
+  html .materials-grid, html .filament-inventory-card, html .materials-inventory-head { padding: 20px; }
+  html .presence-copy { gap: 3px 6px; }
+  html .staff-toolbar .presence-person strong, html .staff-toolbar .presence-person small { font-size: 12px; }
+}
+@media (max-width: 640px) {
+  html .page-shell { width: calc(100% - 40px); }
+  html .get-started, html .my-jobs { padding-top: 40px; padding-bottom: 48px; }
+  html .wizard-heading h1, html .page-title-row h1, html .confirmation-panel h1 { font-size: 34px; }
+  html .wizard-steps { margin-bottom: 20px; }
+  html .wizard-step { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 80px; }
+  html .wizard-step::after { top: 21px; left: 32px; right: 4px; }
+  html .wizard-step b { font-size: 12px; max-width: 72px; }
+  html .wizard-aside { display: block; }
+  html .wizard-aside .good-to-know { display: none; }
+  html .form-card, html .aside-card { padding: 20px; }
+  html .form-section-head { gap: 12px; }
+  html .form-section-head h2 { font-size: 21px; }
+  html .form-section-head > span { font-size: 12px; }
+  html .file-drop { min-height: 220px; padding: 20px 12px; }
+  html .review-row { grid-template-columns: 90px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  html .wizard-actions .button { padding-inline: 16px; font-size: 14px; }
+  html .confirmation-panel { padding: 32px 20px; }
+  html .request-owner { align-items: flex-start; gap: 8px; }
+  html .request-filters { gap: 8px; }
+  html .request-filters a { padding: 10px 12px; font-size: 12px; }
+  html .request-row { grid-template-columns: minmax(0, 1fr) auto; padding: 24px 20px; gap: 12px; }
+  html .request-row-title { grid-column: 1 / -1; }
+  html .request-row-action { grid-column: auto; justify-content: flex-end; }
+  html .request-row-status { min-width: 0; }
+  html .request-row h2 { font-size: 21px; }
+  html .request-row p { font-size: 12px; }
+  html .request-row-action { font-size: 12px; }
+  html .submitter-detail-layout { gap: 24px; }
+  html .job-progress, html .pickup-details { padding: 20px; }
+  html .empty-state { min-height: 260px; padding: 40px 20px; }
+  html .empty-state h2, html .staff-app .empty-state h2 { font-size: 21px; }
+  html .staff-app .staff-page-heading h1, html .staff-app .materials-page-top h1 { font-size: 28px; }
+  html .staff-app .staff-page-heading p, html .staff-app .materials-page-top p { font-size: 14px; }
+  html .staff-app .metric-grid { gap: 12px; }
+  html .staff-app .metric-card > div { font-size: 12px; }
+  html .staff-app .metric-card { padding: 18px; }
+  html .staff-app .metric-card > strong { font-size: 34px; }
+  html .staff-app .metric-card > small { font-size: 12px; }
+  html .staff-app .staff-section-head { align-items: flex-start; flex-wrap: wrap; }
+  html .staff-app .staff-section-head p { font-size: 12px; }
+  html .hours-request-form, html .hours-admin-adjust-form, html .hours-admin-give-form { grid-template-columns: 1fr; }
+  html .local-data-controls { gap: 12px; align-items: flex-start; }
+  html .viewport-menu { padding: 16px; }
+}
+@media (max-width: 419px) {
+  html .page-shell { width: calc(100% - 32px); }
+  html .wizard-heading h1, html .page-title-row h1, html .confirmation-panel h1 { font-size: 28px; }
+  html .wizard-heading p, html .page-title-row p { font-size: 17px; }
+  html .staff-app .staff-content { padding-inline: 16px; }
+  html .staff-app .metric-card { padding: 16px; }
+  html .review-row { grid-template-columns: 1fr; gap: 4px; }
+  html .request-row { padding-inline: 16px; }
+  html .request-row-status .status { font-size: 12px; }
+  html .toolbar-controls { gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html .button:active, html .button:active:hover, html button:not(:disabled):active { transform: none; }
+}
+
+/* Follow-up spacing audit: inset card headings and consistent form controls. */
+html .staff-app .detail-section > .staff-section-head {
+  margin: -24px -24px 24px;
+  padding: 24px;
+}
+html .staff-app .staff-section-head > div { min-width: 0; }
+html .staff-app .staff-section-head :is(h2, h3) { overflow-wrap: anywhere; }
+
+/* Explicit single-line heights avoid Safari's compact native select sizing. */
+html .field input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+html .staff-app .field input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+html .field select:not([multiple]),
+html .staff-app .field select:not([multiple]) {
+  height: 48px;
+  min-height: 48px;
+  line-height: 24px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+html .field select:not([multiple]),
+html .staff-app .field select:not([multiple]),
+html .field select:not([multiple]):focus,
+html .staff-app .field select:not([multiple]):focus {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 11px 42px 11px 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2386868b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 14px center;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+}
+html .field textarea, html .staff-app .field textarea {
+  min-height: 120px;
+  line-height: 1.47;
+}
+html .color-input-preview, html .staff-app .color-input-preview { min-height: 48px; }
+
+@media (max-width: 767px) {
+  html .staff-app .detail-section > .staff-section-head {
+    margin: -20px -20px 20px;
+    padding: 20px;
+  }
+  html .staff-app :is(.hours-request-form, .hours-admin-filter-form, .hours-admin-adjust-form) {
+    padding: 20px;
+    gap: 20px;
+  }
+}
+@media (forced-colors: active) {
+  html .field select:not([multiple]),
+  html .staff-app .field select:not([multiple]),
+  html .field select:not([multiple]):focus,
+  html .staff-app .field select:not([multiple]):focus {
+    -webkit-appearance: auto;
+    appearance: auto;
+    background-image: none;
+  }
+}
+
+/* One outer rounded card; the internal hours-form divider remains straight. */
+html .staff-app .hours-request-form-section { overflow: hidden; }
+html .staff-app .hours-request-form-section > .staff-section-head { border-radius: 18px 18px 0 0; }
+html .staff-app .hours-request-form-section > .hours-request-form { border: 0; border-radius: 0; margin: 0; background: var(--surface-soft); }

@@ -1,3 +1,4 @@
+import { filesService } from "./filesService.js?v=2.2&rev=5";
 import { canSelectFilament, filamentPalette, filamentSelectionDetails } from "./filamentPalette.js?v=2.2&rev=5";
 import { inventoryService } from "./services.js?v=2.2&rev=5";
 import { esc, footer, publicHeader, statusBadge, dateTime } from "./pageShared.js?v=2.2&rev=5";
@@ -108,13 +109,13 @@ function wizardPanel(state, filaments) {
     ✓\
   </div>\
   <span class="eyebrow">\
-    LOCAL DEMO DATA\
+    ${filesService.mode === "demo" ? "LOCAL DEMO DATA" : "REQUEST SUBMITTED"}\
   </span>\
   <h1>\
     Request ready for review.\
   </h1>\
   <p>\
-    Your demo request has been added locally for the school team to review. No file was uploaded and no real request was sent.\
+    ${filesService.mode === "demo" ? "Your demo request has been saved in this browser for review. No real request or email was sent." : "Your request and any original attachments have been saved by the server for staff review."}\
   </p>\
   <div class="confirmation-id">\
     <span>\
@@ -162,7 +163,7 @@ function wizardPanel(state, filaments) {
 <div class="model-link-divider"><span>OR PASTE A MODEL LINK</span></div>\
 <label class="field model-link-field">\
     <span>Model URL</span>\
-    <input id="model-link-url" name="modelUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com/model.stl" value="${esc(w.linkUrl || "")}" aria-describedby="model-link-help" />\
+    <input id="model-link-url" maxlength="2048" name="modelUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com/model.stl" value="${esc(w.linkUrl || "")}" aria-describedby="model-link-help" />\
     <small id="model-link-help">MakerWorld links show a model card preview. Other links are included with your request without being opened.</small>\
 </label>\
 <div class="form-note">\
@@ -170,7 +171,7 @@ function wizardPanel(state, filaments) {
     ⓘ\
   </span>\
   <p>\
-    The model is previewed locally. On submission, the original file is saved in this browser for staff preview and download. It is never uploaded. Model links are included with your request.\
+    ${filesService.mode === "demo" ? "The model is previewed locally. On submission, the original file is saved in this browser for staff preview and download. It is never uploaded." : "The model is previewed locally. On submission, original files are uploaded and must be confirmed as stored by the server."} Model links are included with your request.\
   </p>\
 </div>`
     : w.step === 2 ? `<div class="form-section-head">\
@@ -254,7 +255,7 @@ ${filamentPalette(filaments, w.inventoryId)}\
       Review your request\
     </h2>\
     <p>\
-      Check the details before adding this demo request.\
+      Check the details before submitting this request.\
     </p>\
   </div>\
 </div>\
@@ -264,7 +265,7 @@ ${reviewCard(w)}\
     Staff review required\
   </strong>\
   <p>\
-    Your request will require staff review. Final feasibility, cost, and turnaround time are not confirmed by this demo.\
+    Your request will require staff review. Final feasibility, cost, and turnaround time are subject to staff review.\
   </p>\
 </div>`;
   const footerActions = `<div class="wizard-actions">\
@@ -398,19 +399,20 @@ export async function getStartedPage(state) {
   const filaments = await inventoryService.listInventory();
   const availableFilaments = filaments.filter(canSelectFilament);
   const selected = availableFilaments.find((item) => item.id === state.wizard.inventoryId)
-    || availableFilaments.find((item) => item.material === state.wizard.material && item.color === state.wizard.color);
+    || (!state.wizard.inventoryId ? availableFilaments.find((item) => item.material === state.wizard.material && item.color === state.wizard.color) : null);
   if (selected) {
     state.wizard.inventoryId = selected.id;
     state.wizard.material = selected.material;
     state.wizard.color = selected.color;
   } else {
+    if (state.wizard.inventoryId) state.wizard.selectionError = "Your selected filament is no longer available. Choose a current colour.";
     state.wizard.inventoryId = "";
     state.wizard.material = "";
     state.wizard.color = "";
   }
   return `${publicHeader(state)}\
 <main class="get-started page-shell">\
-  ${wizardPanel(state, filaments)}\
+  ${state.wizard.selectionError ? `<p class="form-error" role="alert">${esc(state.wizard.selectionError)}</p>` : ""}${wizardPanel(state, filaments)}\
 </main>\
 ${footer()}`;
 }

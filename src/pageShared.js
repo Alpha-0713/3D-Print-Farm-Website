@@ -24,7 +24,7 @@ export function logo() {
   <svg viewBox="0 0 36 36" aria-hidden="true">\
     <path d="M4 6h28v6H4zM4 15h22v6H4zM4 24h16v6H4z" fill="currentColor"/>\
   </svg>\
-  <span>3D PRINT FARM</span>\
+  <span>3D Print Farm</span>\
 </a>`;
 }
 
@@ -55,11 +55,12 @@ export function inboxControl() {
 }
 
 export function toolbarControls() {
-  return `<div class="toolbar-controls" aria-label="Account and appearance controls">${appearanceControls()}${roleSwitcher()}${authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW) ? inboxControl() : ""}</div>`;
+  return `<div class="toolbar-controls" aria-label="Account and appearance controls">${appearanceControls()}${roleSwitcher()}${authService.getCurrentIdentity() ? inboxControl() : ""}</div>`;
 }
 
 export function roleSwitcher() {
   const identity = authService.getCurrentIdentity();
+  if (authService.mode === "api") return `<div class="session-account" aria-label="Authenticated account">${identity ? `${esc(identity.name)} · Level ${authService.getCurrentRole().level}` : "Signed out"}</div>`;
   const identities = authService.getDemoIdentities();
   const signature = JSON.stringify(identities.map(({ id, name, roleId }) => [id, name, roleId]));
   const words = identity.name.trim().split(/\s+/);
@@ -102,24 +103,27 @@ export function publicHeader(state) {
   const canOpenStaff = authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW);
   const getStartedActive = location.hash === "#/get-started" ? 'aria-current="page"' : "";
 
-  return `<header class="public-header">\
-  <div class="header-inner">\
-    ${logo()}\
-    <nav class="public-nav" id="public-nav" aria-label="Main navigation">\
-      <div class="mobile-only-nav">\
-        <a class="button button-lime button-small" href="#/get-started">Get Started ↗</a>\
-        <a href="#/my-jobs">My Print Jobs</a>\
-        ${canOpenStaff ? '<a href="#/staff">Staff Portal</a>' : ""}\
-      </div>\
-    </nav>\
-    <button class="menu-toggle" type="button" aria-expanded="${state.menuOpen}" aria-controls="public-nav" data-action="menu-toggle" aria-label="${state.menuOpen ? "Close" : "Open"} navigation"><span class="menu-toggle-icon" aria-hidden="true"><i class="menu-toggle-line menu-toggle-line-top"></i><i class="menu-toggle-line menu-toggle-line-middle"></i><i class="menu-toggle-line menu-toggle-line-bottom"></i></span></button>\
-    <div class="header-actions">\
-      <a class="nav-quiet" href="#/my-jobs">My Print Jobs</a>\
-      ${canOpenStaff ? '<a class="nav-quiet staff-link" href="#/staff">Staff Portal</a>' : ""}\
-      <a class="button button-lime button-small" href="#/get-started" ${getStartedActive}>Get Started <span aria-hidden="true">↗</span></a>\
-      ${toolbarControls()}\
-    </div>\
-  </div>\
+  return `<header class="public-header" data-surface="light">
+  <button class="skip-link" type="button" data-action="skip-main">Skip to content</button>
+  <div class="global-bar">
+    <div class="header-inner">
+      ${logo()}
+      <nav class="public-nav" id="public-nav" aria-label="Main navigation">
+        <div class="nav-section-links"><a href="#/printers">Our printers</a><a href="#/faq">Questions & answers</a></div>
+        <div class="nav-account-links">
+          <a href="#/my-jobs">My Print Jobs</a>
+          ${canOpenStaff ? '<a class="staff-link" href="#/staff">Staff Portal</a>' : ""}
+          <a class="button button-lime mobile-start-link" href="#/get-started" ${getStartedActive}>Get Started</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="button button-lime button-small header-start-link" href="#/get-started" ${getStartedActive}>Get Started</a>
+        ${toolbarControls()}
+        <button class="menu-toggle" type="button" aria-expanded="${state.menuOpen}" aria-controls="public-nav" data-action="menu-toggle" aria-label="${state.menuOpen ? "Close" : "Open"} navigation"><span class="menu-toggle-icon" aria-hidden="true"><i class="menu-toggle-line menu-toggle-line-top"></i><i class="menu-toggle-line menu-toggle-line-middle"></i><i class="menu-toggle-line menu-toggle-line-bottom"></i></span></button>
+      </div>
+    </div>
+  </div>
+
 </header>`;
 }
 
@@ -144,14 +148,15 @@ export function footer() {
   </div>\
   <div class="footer-bottom">\
     <span>© ${new Date().getFullYear()} 3D Print Farm</span>\
-    <span>Files stay in your browser · no emails are sent</span>
-    <span>v2.2 · Print Farm</span>\
+    <span>${authService.mode === "demo" ? "Demo · files stay in your browser · no emails are sent" : "API workspace · server session"}</span>
+    <span>v2.4 · Print Farm</span>\
   </div>\
   ${localDataControls()}\
 </footer>`;
 }
 
 export function localDataControls() {
+  if (authService.mode !== "demo") return '<div class="local-data-controls"><p>API workspace · connected server records</p></div>';
   return `<div class="local-data-controls"><p>Reset this website’s saved data, demo accounts, and appearance settings in this browser.</p><button type="button" data-action="reset-local-data">Reset Local Data</button></div>`;
 }
 

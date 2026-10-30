@@ -85,7 +85,7 @@ test("selection uses an inventory ID, rejects invalid choices, and is checked ag
   const current = JSON.parse(storage.get(key));
   current.inventory[0].available = false;
   storage.set(key, JSON.stringify(current));
-  await assert.rejects(jobsService.createJob({ ...wizard, file: { name: "test.stl", sizeBytes: 1000 }, projectName: "Palette request" }), /no longer available/);
+  await assert.rejects(jobsService.createJob({ ...wizard, modelUrl: "https://example.com/test.stl", submissionKey: crypto.randomUUID(), projectName: "Palette request" }), /no longer available/);
 });
 
 test("palette labels escape user-entered names and a completely empty inventory remains usable", async () => {

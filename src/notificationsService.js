@@ -1,9 +1,7 @@
-import { jobsService } from "./services.js?v=2.2&rev=5";
-
-export const notificationsService = {
-  mode: "mock",
-  async listForJob(jobId) { return jobsService.listNotifications(jobId); },
-  async get(notificationId) { return jobsService.getNotification(notificationId); },
-  async retry(notificationId) { return jobsService.retryNotification(notificationId); },
-  // Completion only creates a local notification record; it never sends email.
+import { jobsService, notificationAdapter } from "./services.js?v=2.2&rev=5";
+export const notificationsService = notificationAdapter || {
+  mode: "demo",
+  listForJob: jobId => jobsService.listNotifications(jobId),
+  get: notificationId => jobsService.getNotification(notificationId),
+  retry: notificationId => jobsService.retryNotification(notificationId),
 };

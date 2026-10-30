@@ -18,7 +18,7 @@ const { normalizeHexInput } = await import("../src/filamentColor.js?v=2.2&rev=5"
 const { staffMaterialForm, staffMaterialDetail, jobDetailsPage } = await import("../src/staffPages.js?v=2.2&rev=5");
 const filament = { id: "black", material: "PLA", color: "Black", hexColor: "#000000", lowStock: false, available: true };
 const blankState = () => ({ jobs: [], notifications: [], inventory: [{ ...filament }], contributions: [], hours: { transactions: [], requests: [] } });
-const request = (name = "Test part") => ({ projectName: name, file: { name: "part.stl", sizeBytes: 1024 }, material: "PLA", color: "Black", inventoryId: "black", purpose: "Class project", notes: "Check orientation" });
+const request = (name = "Test part") => ({ projectName: name, modelUrl: "https://example.com/part.stl", submissionKey: crypto.randomUUID(), material: "PLA", color: "Black", inventoryId: "black", purpose: "Class project", notes: "Check orientation" });
 const load = () => JSON.parse(storage.get(storeKey));
 
 beforeEach(() => {

@@ -1,73 +1,38 @@
-export const MAX_MODEL_FILE_SIZE = 25 * 1024 * 1024;
-export const ACCEPTED_MODEL_EXTENSIONS = ["stl", "3mf", "obj"];
-
-export function getModelFileExtension(name = "") {
-  const cleanName = String(name).trim();
-  const dot = cleanName.lastIndexOf(".");
-  return dot < 0 ? "" : cleanName.slice(dot + 1).toLowerCase();
+import { config } from "./config.js";
+import { authService } from "./authService.js?v=2.2&rev=5";
+import { fileValidation } from "./fileValidation.js";
+import { ServiceError, validation } from "./serviceError.js";
+export { MAX_MODEL_FILE_SIZE, ACCEPTED_MODEL_EXTENSIONS, getModelFileExtension } from "./fileValidation.js";
+export function createHttpFiles(client) {
+  return {
+    ...fileValidation, mode: "api",
+    async upload(files, { idempotencyKey } = {}) {
+      validation(idempotencyKey, "An upload idempotency key is required.");
+      const form = new FormData();
+      for (const file of files) { const result = fileValidation.inspectSelection(file); validation(result.valid && file instanceof Blob, result.error || "Choose the original file."); form.append("files", file, file.name); }
+      const result = await client.request("/attachments", { method: "POST", body: form, idempotencyKey });
+      if (!Array.isArray(result) || result.length !== files.length || result.some((a, i) => a?.status !== "stored" || !a.id || a.name !== files[i].name || a.sizeBytes !== files[i].size)) throw new ServiceError("invalid_response", "The server did not confirm that every original was stored.");
+      return result;
+    },
+    async get(id) {
+      const metadata = await this.getAttachment(id);
+      if (metadata.status !== "stored") throw new ServiceError("validation", "The original is not ready for download.");
+      const blob = await client.request(`/attachments/${encodeURIComponent(id)}/original`, { binary: true });
+      if (blob.size !== metadata.sizeBytes) throw new ServiceError("invalid_response", "The downloaded original is incomplete.");
+      return new File([blob], metadata.name, { type: blob.type });
+    },
+    getAttachment: id => client.request(`/attachments/${encodeURIComponent(id)}`),
+    async verify(attachments) {
+      for (const attachment of attachments) {
+        const saved = await this.getAttachment(attachment.id);
+        validation(saved?.status === "stored" && saved.name === attachment.name && saved.sizeBytes === attachment.sizeBytes, "The stored attachment is unavailable or changed. Upload the original again.");
+      }
+      return attachments;
+    },
+    // Unclaimed uploads are expired by the backend; never delete on an uncertain job response.
+  };
 }
-
-function isValidSize(sizeBytes) {
-  return Number.isFinite(sizeBytes) && sizeBytes > 0;
-}
-
-export const filesService = {
-  mode: "local-preview-only",
-  inspectSelection(file) {
-    if (!file) {
-      return { valid: false, error: "Choose a model file." };
-    }
-    if (typeof file.name !== "string" || !file.name.trim()) {
-      return { valid: false, error: "Choose a file with a filename." };
-    }
-
-    const extension = getModelFileExtension(file.name);
-    if (!ACCEPTED_MODEL_EXTENSIONS.includes(extension)) {
-      return { valid: false, error: "Unsupported file type. Choose an STL, 3MF, or OBJ file." };
-    }
-    if (!isValidSize(file.size)) {
-      return { valid: false, error: "The selected model file is empty or has an invalid size." };
-    }
-    if (file.size > MAX_MODEL_FILE_SIZE) {
-      return { valid: false, error: "This file is larger than the 25 MB demo limit." };
-    }
-
-    return {
-      valid: true,
-      metadata: { name: file.name, sizeBytes: file.size, extension },
-    };
-  },
-  inspectUrl(value) {
-    let url;
-    try {
-      url = new URL(String(value || "").trim());
-    } catch {
-      return { valid: false, error: "Enter a valid model URL." };
-    }
-    if (url.protocol !== "https:") {
-      return { valid: false, error: "Use a direct HTTPS URL. Other protocols are not supported." };
-    }
-    if (url.username || url.password) {
-      return { valid: false, error: "URLs containing a username or password are not supported." };
-    }
-    return { valid: true, url: url.href };
-  },
-  validateMetadata(metadata) {
-    if (!metadata || typeof metadata.name !== "string" || !metadata.name.trim()) {
-      throw new Error("Choose a model file again before submitting.");
-    }
-
-    const extension = getModelFileExtension(metadata.name);
-    if (!ACCEPTED_MODEL_EXTENSIONS.includes(extension)) {
-      throw new Error("Choose an STL, 3MF, or OBJ file.");
-    }
-    if (!isValidSize(metadata.sizeBytes)) {
-      throw new Error("The model file is empty or has an invalid size.");
-    }
-    if (metadata.sizeBytes > MAX_MODEL_FILE_SIZE) {
-      throw new Error("The model must be 25 MB or smaller.");
-    }
-
-    return true;
-  },
-};
+const implementation = config.mode === "demo"
+  ? (await import("./demo/files.js")).demoFiles
+  : createHttpFiles(authService.client);
+export const filesService = implementation;

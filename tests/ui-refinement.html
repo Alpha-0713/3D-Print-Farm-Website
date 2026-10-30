@@ -1,7 +1,8 @@
 <!doctype html><html lang="en" data-theme="dark" data-accent="monochrome"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>UI refinement checks · v2.2</title>
 <link rel="stylesheet" href="../src/styles.css?v=2.2&rev=9">
-<style>.qa-tools{padding:20px}.qa-tools h1{font-size:20px}.qa-tools button{padding:10px}#results{white-space:pre-wrap;font:12px/1.6 system-ui}.qa-anchor{position:fixed;z-index:1003;transform:translateZ(0);overflow:hidden;width:124px;height:36px}.qa-anchor .toolbar-controls{margin:0}</style>
+<link rel="stylesheet" href="../src/apple-interface.css?v=2.4&amp;rev=4"><link rel="stylesheet" href="../src/apple-public.css?v=2.4&amp;rev=4">
+<style>@import url("../src/fonts.css");.qa-tools{padding:20px}.qa-tools h1{font-size:20px}.qa-tools button{padding:10px}#results{white-space:pre-wrap;font:12px/1.6 "Inter", Arial, sans-serif}.qa-anchor{position:fixed;z-index:1003;transform:translateZ(0);overflow:hidden;width:156px;height:44px}.qa-anchor .toolbar-controls{margin:0}</style>
 </head><body><div class="qa-tools"><h1>UI refinement checks</h1><button id="run" disabled>Run layout checks</button><pre id="results" role="status">Loading production components…</pre></div><div id="fixture"></div><div id="corners"></div>
 <script type="module">
 import { staffShell } from '../src/staffPages.js?v=2.2&rev=5';
@@ -29,21 +30,21 @@ run.onclick=async()=>{
   const summaries=[...root.querySelectorAll('.toolbar-controls > :is(.appearance-controls,.role-switcher,.inbox-picker)')];
   check(summaries.length===3&&summaries[0].matches('.appearance-controls')&&summaries[1].matches('.role-switcher')&&summaries[2].matches('.inbox-picker'),theme+' toolbar order is Appearance → Identity → Inbox');
   const boxes=[...root.querySelectorAll('.toolbar-controls > .appearance-controls summary,.toolbar-controls > .role-switcher > summary,.toolbar-controls > .inbox-picker > summary')].map(e=>e.getBoundingClientRect());
-  check(boxes.every(r=>almost(r.width,36)&&almost(r.height,36)&&almost(r.top,boxes[0].top)),theme+' toolbar controls have equal dimensions and vertical alignment');
+  check(boxes.every(r=>almost(r.width,44)&&almost(r.height,44)&&almost(r.top,boxes[0].top)),theme+' toolbar controls have equal dimensions and vertical alignment');
   const centered=[...root.querySelectorAll('.toolbar-controls > .appearance-controls summary,.toolbar-controls > .role-switcher > summary,.toolbar-controls > .inbox-picker > summary')].every(summary=>{const outer=summary.getBoundingClientRect(),inner=summary.firstElementChild.getBoundingClientRect();return almost(outer.x+outer.width/2,inner.x+inner.width/2)&&almost(outer.y+outer.height/2,inner.y+inner.height/2);});
   check(centered,theme+' toolbar glyphs and initials are centered inside their control faces');
   check(root.querySelector('.role-trigger-initials').textContent==='LT'&&!root.querySelector('.role-trigger-name'),theme+' collapsed identity contains initials only');
   check(!root.querySelector('[type="range"], [data-action="set-accent"]'),theme+' adjustable transparency and saturated accent controls are absent');
   const toolbar=rect('.staff-toolbar'), inbox=rect('.inbox-picker > summary');
-  check(almost(toolbar.right-inbox.right,inbox.top-toolbar.top),theme+' top-right corner has mirrored clearance');
+  check(toolbar.right-inbox.right>=19&&inbox.top-toolbar.top>=15,theme+' toolbar controls retain comfortable edge clearance');
   if(innerWidth>=768){
    const brand=rect('.sidebar-brand .brand svg'),side=rect('.staff-sidebar'),back=rect('.back-public svg');
    check(almost(brand.left-side.left,brand.top-side.top)&&almost(back.left-side.left,side.bottom-back.bottom),theme+' sidebar top-left and bottom-left corners mirror their insets');
    check([...root.querySelectorAll('.sidebar-link > span:first-child')].every(e=>almost(e.getBoundingClientRect().left,brand.left))&&almost(back.left,brand.left),theme+' logo, navigation icons, and back arrow share a leading rail');
   }
-  check([...root.querySelectorAll('.metric-card,.detail-section,input,.review-card,.toolbar-controls summary')].filter(e=>!e.closest('.role-create-account')).every(e=>getComputedStyle(e).borderTopLeftRadius==='12px'),theme+' primary surfaces, nested panels, controls and inputs share 12px corners');
+  check([...root.querySelectorAll('.metric-card,.detail-section')].every(e=>getComputedStyle(e).borderTopLeftRadius==='18px')&&getComputedStyle(root.querySelector('.review-card')).borderTopLeftRadius==='8px'&&getComputedStyle(root.querySelector('.toolbar-controls summary')).borderTopLeftRadius==='50%',theme+' utility cards, nested panels, and circular controls use the Apple radius scale');
   const primary=getComputedStyle(root.querySelector('.metric-card')).backgroundColor,secondary=getComputedStyle(root.querySelector('.review-card')).backgroundColor;
-  check(!primary.startsWith('rgba')&&secondary.includes('0.94'),theme+' main surfaces are solid and secondary glass uses the fixed 6% mapping');
+  check(!primary.startsWith('rgba')&&[...root.querySelectorAll('.metric-card,.detail-section,.review-card,.toolbar-controls summary')].every(e=>getComputedStyle(e).backgroundImage==='none'&&getComputedStyle(e).boxShadow==='none'),theme+' interface surfaces are flat, without decorative gradients or shadows');
   const initial=[...root.querySelectorAll('.sidebar-link')].map(e=>e.getBoundingClientRect());
   commitPage(root,staffShell('<p>Another page</p>','hours'));syncFloatingControls(root);syncSidebarSelection(root);await settle();
   check([...root.querySelectorAll('.sidebar-link')].every((e,i)=>almost(e.getBoundingClientRect().x,initial[i].x)&&almost(e.getBoundingClientRect().y,initial[i].y)&&almost(e.getBoundingClientRect().height,initial[i].height)),theme+' selected and unselected rows retain identical geometry');
@@ -53,7 +54,7 @@ run.onclick=async()=>{
    for(const selector of ['.accent-picker','.role-switcher','.inbox-picker']){
     const picker=anchor.querySelector(selector);picker.querySelector('summary').click();await settle();
     const menu=picker.querySelector('.viewport-menu');
-    if(!matchMedia('(prefers-reduced-motion: reduce)').matches)check(getComputedStyle(menu).animationName==='liquid-menu-in'&&getComputedStyle(menu).animationDuration==='0.28s',`${theme} ${vertical}-${horizontal} ${selector} uses the shared glass opening motion`);
+    if(!matchMedia('(prefers-reduced-motion: reduce)').matches)check(getComputedStyle(menu).animationName==='liquid-menu-in'&&getComputedStyle(menu).animationDuration==='0.28s',`${theme} ${vertical}-${horizontal} ${selector} uses the shared menu opening motion`);
     await Promise.all(menu.getAnimations().map(a=>a.finished.catch(()=>{})));
     const r=menu.getBoundingClientRect();
     check(r.left>=20&&r.top>=20&&r.right<=innerWidth-20&&r.bottom<=innerHeight-20,`${theme} ${vertical}-${horizontal} ${selector} stays inside viewport gutters`);

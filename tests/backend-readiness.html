@@ -1,0 +1,59 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Backend readiness regression checks</title><style>@import url("../src/fonts.css");body{font:14px/1.6 "Inter", Arial, sans-serif;background:#181818;color:#eee;margin:20px}button{padding:10px 16px;cursor:pointer}pre{white-space:pre-wrap}iframe{width:100%;height:760px;border:1px solid #555}</style><h1>Backend readiness checks</h1><p>Run on an isolated QA origin. Uses synthetic profiles, requests, local originals and mocked HTTP responses; restores prior origin data. No Google account, email or real backend is used.</p><button id="run">Run integration checks</button><pre id="result" role="status">Ready.</pre><iframe id="frame" title="Production frontend integration check"></iframe><script type="module">
+import {jobsService,inventoryService} from '../src/services.js?v=2.2&rev=5';
+import {authService} from '../src/authService.js?v=2.2&rev=5';
+import {modelFilesStore} from '../src/modelFilesStore.js?v=2.3';
+const frame=document.querySelector('#frame'), result=document.querySelector('#result'), run=document.querySelector('#run');
+const key='three-d-print-farm-demo-v3', prefix='three-d-print-farm-';
+const doc=()=>frame.contentDocument, win=()=>frame.contentWindow;
+const wait=async(predicate,label)=>{const deadline=Date.now()+15000;while(Date.now()<deadline){if(predicate())return;await new Promise(r=>setTimeout(r,35));}throw Error('Timed out: '+label+' · '+doc()?.body.textContent.slice(-400));};
+run.onclick=async()=>{
+ run.disabled=true; const passed=[],savedFiles=[];
+ const backup=Object.fromEntries(Object.keys(localStorage).filter(k=>k.startsWith(prefix)).map(k=>[k,localStorage.getItem(k)]));
+ const check=(value,label)=>{if(!value)throw Error(label);passed.push('PASS · '+label);result.textContent=passed.join('\n');};
+ const restore=()=>{for(const k of Object.keys(localStorage).filter(k=>k.startsWith(prefix)))if(!(k in backup))localStorage.removeItem(k);for(const[k,v]of Object.entries(backup))localStorage.setItem(k,v);};
+ try{
+ await document.fonts.ready; check(document.fonts.check('16px "Inter"') && getComputedStyle(document.body).fontFamily.includes("Inter"),"Self-hosted Inter loads for the page font");
+ for(const k of Object.keys(localStorage).filter(k=>k.startsWith(prefix)))localStorage.removeItem(k);
+ localStorage.setItem(key,JSON.stringify({jobs:[],notifications:[],inventory:[{id:'qa-original',material:'PLA',color:'QA Gray',hexColor:'#808080',available:true,lowStock:false}],contributions:[],hours:{transactions:[],requests:[]}}));
+ authService.switchRole('demo-person-01');
+ const file=new File([await(await fetch('./fixtures/test-part.stl')).arrayBuffer()],'QA original.stl');
+ const request={submissionKey:crypto.randomUUID(),projectName:'QA retained original',inventoryId:'qa-original',material:'PLA',color:'QA Gray',modelFiles:[file],file:{name:file.name,sizeBytes:file.size}};
+ const job=await jobsService.createJob(request);savedFiles.push(...job.attachments.map(a=>a.id));
+ const original=await modelFilesStore.get(savedFiles[0]);check(await original.text()===await file.text(),'New file request retains its original bytes');
+ check((await jobsService.createJob(request)).id===job.id,'Retried creation returns the same job');
+ const changed=new File([new Uint8Array(file.size).fill(32)],file.name);let changedRefused=false;try{await jobsService.createJob({...request,modelFiles:[changed]});}catch(error){changedRefused=error.code==='conflict';}check(changedRefused,'Creation keys reject different original bytes with the same filename and size');
+ let refused=false;try{await jobsService.createJob({...request,submissionKey:crypto.randomUUID(),modelFiles:[]});}catch{refused=true;}check(refused,'Filename-only creation is rejected at the service boundary');
+ authService.switchRole('demo-person-04');await jobsService.reviewRequest(job.id,'rejected','QA reason: revise the part');authService.switchRole('demo-person-01');
+ frame.src='../index.html#/my-jobs/'+job.id;await wait(()=>doc()?.querySelector('.submitter-detail'),'own detail');
+ check(Boolean(doc().querySelector('.inbox-picker')),'Level 1 has a personal inbox');
+ doc().querySelector('.inbox-picker > summary').click();await wait(()=>doc().querySelector('.inbox-entry'),'rejection entry');doc().querySelector('.inbox-entry').click();await wait(()=>doc().querySelector('.inbox-detail-actions a'),'request action');
+ check(doc().querySelector('.inbox-detail-actions a').getAttribute('href').startsWith('#/my-jobs/'),'Level 1 rejection links to its accessible request');
+ check(!doc().querySelector('.inbox-detail-actions [data-action="approve-job"]'),'Level 1 gets no staff approval action');
+ win().location.hash='#/get-started';await wait(()=>doc().querySelector('#model-link-url'),'wizard');
+ doc().querySelector('#model-link-url').value='javascript:alert(1)';doc().querySelector('#model-link-url').dispatchEvent(new (win().Event)('input',{bubbles:true}));doc().querySelector('[data-action="wizard-next"]').click();await wait(()=>doc().querySelector('#toast-root').textContent.includes('HTTPS'),'URL validation feedback');check(!doc().querySelector('.filament-palette'),'Wizard rejects unsupported URL protocols');
+ doc().querySelector('#model-link-url').value='https://example.com/unfinished.stl';doc().querySelector('#model-link-url').dispatchEvent(new (win().Event)('input',{bubbles:true}));doc().querySelector('[data-action="save-draft"]').click();await wait(()=>Boolean(localStorage.getItem('three-d-print-farm-draft-v2:demo-person-01')),'owner draft');
+ const transfer=new (win().DataTransfer)();transfer.items.add(new (win().File)([await file.arrayBuffer()],'QA selected.stl'));const input=doc().querySelector('#model-file');input.files=transfer.files;input.dispatchEvent(new (win().Event)('change',{bubbles:true}));
+ authService.switchRole('demo-person-02');win().dispatchEvent(new (win().StorageEvent)('storage',{key:'three-d-print-farm-demo-role',newValue:'demo-person-02'}));await wait(()=>doc().querySelector('.role-switcher > summary')?.getAttribute('aria-label').includes('Leddy'),'identity switch');
+ await wait(()=>doc().querySelector('#model-link-url')?.value==='','clean wizard');check(!doc().querySelector('.selected-file')&&!doc().querySelector('#model-preview canvas'),'Identity switch clears selected files, preview and unfinished fields');
+ authService.switchRole('demo-person-01');win().dispatchEvent(new (win().StorageEvent)('storage',{key:'three-d-print-farm-demo-role',newValue:'demo-person-01'}));await wait(()=>doc().querySelector('#model-link-url')?.value==='https://example.com/unfinished.stl','restore owned draft');check(true,'Returning owner restores only its own draft, without selected files');
+ const archive=JSON.parse(localStorage.getItem(key));archive.jobs.push(...Array.from({length:45},(_,n)=>({...archive.jobs[0],id:'QA-old-'+n,projectName:'Historical '+n,status:'COLLECTED',initialApproval:{legacy:true},submittedAt:new Date(2020,0,n+1).toISOString()})));localStorage.setItem(key,JSON.stringify(archive));
+ authService.switchRole('demo-person-04');win().dispatchEvent(new (win().StorageEvent)('storage',{key:'three-d-print-farm-demo-role',newValue:'demo-person-04'}));win().location.hash='#/staff/jobs';await wait(()=>doc().querySelector('[data-form="staff-jobs-filter"]'),'complete job list');check(doc().querySelector('h1').textContent==='All jobs','Staff can reach complete job search, filters and pagination');
+ check(doc().querySelectorAll('tbody tr').length===20,'Complete staff list renders a bounded first page of older records');doc().querySelector('.jobs-pagination a').click();await wait(()=>doc().querySelector('p[role="status"]')?.textContent.includes('Page 2'),'older page');check(doc().querySelectorAll('tbody tr').length===20,'Older records remain discoverable on the next page');
+ const search=doc().querySelector('[name="search"]');search.value='Historical 44';search.dispatchEvent(new (win().Event)('input',{bubbles:true}));doc().querySelector('[data-form="staff-jobs-filter"]').requestSubmit();await wait(()=>doc().querySelector('p[role="status"]')?.textContent.includes('1 matching jobs'),'archive search');check(doc().querySelector('tbody').textContent.includes('Historical 44'),'Search finds a historical job beyond the recent list');
+ for(const width of [1440,768,390,320]){frame.style.width=width+'px';await new Promise(r=>setTimeout(r,80));check(doc().documentElement.scrollWidth<=win().innerWidth+1,'New job list and filters fit at '+width+'px');}frame.style.width='100%';
+
+ win().location.hash='#/section/%E0%A4%A';await wait(()=>doc().querySelector('h1')?.textContent==='Page not found','malformed route');check(true,'Malformed route displays a safe not-found page');
+ const broken=JSON.parse(localStorage.getItem(key));broken.jobs.push({id:'QA-invalid-record'});const raw=JSON.stringify(broken);localStorage.setItem(key,raw);win().location.hash='#/my-jobs';await wait(()=>doc().querySelector('.storage-recovery'),'recovery notice');check(localStorage.getItem(key)===raw,'Invalid record leaves saved bytes unchanged and shows recovery/export action');
+ // Exercise actual API-mode page behavior with mocked fetch, before the app modules load.
+ frame.src='about:blank';await wait(()=>!doc()?.querySelector('#app'),'unmount demo');
+ const html=await(await fetch('../index.html')).text();
+ const mock=`<script>window.PRINT_FARM_CONFIG={MODE:'api',API_BASE_URL:'${location.origin}/api/v1',POLL_INTERVAL_MS:60000};window.qaResponse='loading';window.fetch=async function(url){const path=new URL(url,location.href).pathname;if(path.endsWith('/session')){if(window.qaResponse==='loading')await new Promise(r=>setTimeout(r,100));if(window.qaResponse==='offline')throw Error('QA offline');return new Response(JSON.stringify({data:window.qaResponse==='signed-out'?{status:'signed-out'}:{status:'signed-in',user:{id:'qa-api-user',name:'QA API user',email:'qa-api@example.com',roleId:'regular_teacher'},permissions:['print_request.create','my_jobs.view'],csrfToken:'QA-memory-CSRF'}}),{headers:{'Content-Type':'application/json'}});}if(window.qaResponse==='offline')throw Error('QA offline');return new Response(JSON.stringify({data:path.endsWith('/draft')?null:{items:[],total:0,page:1,pageSize:100}}),{headers:{'Content-Type':'application/json'}});};<\/script>`;
+ frame.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">'+mock);await wait(()=>doc()?.querySelector('h1')?.textContent==='Loading session…','API session loading');check(true,'API mode displays a loading session state');
+ await wait(()=>doc().querySelector('.session-account')?.textContent.includes('QA API user'),'mock API session');check(!doc().querySelector('.role-switcher')&&!doc().querySelector('[data-form="create-demo-account"]'),'API mode exposes backend session details and no demo role/account selector');
+ win().qaResponse='offline';win().location.hash='#/my-jobs';await wait(()=>doc().querySelector('h1')?.textContent==='Page unavailable','API network error');check(!doc().querySelector('.request-row'),'API failure shows an error and never demo records');
+ frame.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">'+mock.replace("window.qaResponse='loading'","window.qaResponse='signed-out'"));await wait(()=>doc()?.querySelector('h1')?.textContent==='Signed out','signed-out API');check(!doc().querySelector('[data-action="switch-role"]'),'Signed-out API has a clear session state without a functional-looking Google button');
+ result.textContent=passed.join('\n')+'\n\nALL '+passed.length+' CHECKS PASSED';
+ }catch(error){result.textContent=passed.join('\n')+'\nFAIL · '+error.message;}
+ finally{frame.removeAttribute('srcdoc');frame.src='about:blank';await modelFilesStore.remove(savedFiles);restore();run.disabled=false;}
+};
+</script></html>

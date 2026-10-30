@@ -1,6 +1,12 @@
+import { parseRoute as parseHashRoute } from "./routes.js";
+import { freshWizard, restoreWizard, draftFields } from "./wizardState.js";
+import { errorMessage } from "./serviceError.js";
+import { diagnosticsService, refreshService } from "./services.js?v=2.2&rev=5";
+import { publicHeader, footer } from "./pageShared.js?v=2.4&rev=4";
+import { syncHeaderSurface } from "./headerSurface.js?v=2.4&rev=4";
 import { syncSidebarState, toggleSidebar, SIDEBAR_STORAGE_KEY } from "./sidebarState.js?v=2.3";
 import { disposeJobFiles, mountJobFiles, previewJobFile, downloadJobFile, resetJobCamera } from "./jobModelFiles.js?v=2.3";
-import { bindPersonalInbox, syncPersonalInbox } from "./personalInbox.js?v=2.2&rev=5";
+import { bindPersonalInbox, syncPersonalInbox, resetInboxSession } from "./personalInbox.js?v=2.2&rev=5";
 import { presenceService } from "./services.js?v=2.2&rev=5";
 import { commitPage } from "./pageCommit.js?v=2.2&rev=5";
 import { syncFloatingControls } from "./floatingControls.js?v=2.2&rev=5";
@@ -8,15 +14,16 @@ import { syncSidebarSelection } from "./sidebarSelection.js?v=2.2&rev=5";
 import { contributionsService, hoursService, inventoryService, jobsService, resetLocalData, rgbFromHex } from "./services.js?v=2.2&rev=5";
 import { filesService } from "./filesService.js?v=2.2&rev=5";
 import { notificationsService } from "./notificationsService.js?v=2.2&rev=5";
-import { dateTime, esc } from "./pageShared.js?v=2.2&rev=5";
-import { accessDeniedPage, homePage } from "./publicPages.js?v=2.2&rev=5";
-import { authService, DEMO_ACCOUNTS_STORAGE_KEY, DEMO_ROLE_STORAGE_KEY } from "./authService.js?v=2.2&rev=5";
+import { dateTime, esc } from "./pageShared.js?v=2.4&rev=4";
+import { accessDeniedPage, homePage } from "./publicPages.js?v=2.4&rev=5";
+import { authService } from "./authService.js?v=2.2&rev=5";
 import { ACTION_PERMISSIONS, FORM_PERMISSIONS, PERMISSION_LABELS, PERMISSIONS, ROUTE_PERMISSIONS } from "./authorization.js?v=2.2&rev=5";
 import { getStartedPage, normalizeOptionalNote } from "./requestWizard.js?v=2.2&rev=5";
 import { applyFilamentSelection } from "./filamentPalette.js?v=2.2&rev=5";
 import { normalizeHexInput } from "./filamentColor.js?v=2.2&rev=5";
 import { myJobDetailsPage, myJobsPage } from "./studentPages.js?v=2.2&rev=5";
 import {
+  staffJobsPage,
   activeJobsPage,
   jobDetailsPage,
   staffMaterialDetail,
@@ -34,22 +41,7 @@ const state = {
   hoursFilters: { student: "", from: "", to: "" },
   hoursEditingId: "",
   hoursStaffSearch: "",
-  wizard: {
-    step: 1,
-    file: null,
-    modelFile: null,
-    previewStatus: "empty",
-    fileFeedback: "",
-    linkUrl: "",
-    makerWorldPreview: null,
-    makerWorldPreviewStatus: "idle",
-    projectName: "",
-    purpose: "Personal project",
-    notes: "",
-    material: "",
-    color: "",
-    submittedJob: null,
-  },
+  wizard: freshWizard(),
 };
 
 const THEME_STORAGE_KEY = "three-d-print-farm-theme";
@@ -62,7 +54,7 @@ function syncAppearanceControls() {
   const root = document.documentElement;
   const theme = THEME_IDS.has(root.dataset.theme) ? root.dataset.theme : "dark";
   root.dataset.theme = theme;
-  root.dataset.accent = "monochrome";
+  root.dataset.accent = "blue";
   document.querySelectorAll(".accent-picker > summary").forEach((summary) => {
     summary.setAttribute("aria-label", "Appearance settings. " + (theme === "light" ? "Light" : "Dark") + " theme");
   });
@@ -89,6 +81,11 @@ function syncAppearanceControls() {
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = background;
+  app.querySelectorAll("img[data-theme-light][data-theme-dark]").forEach((image) => {
+    const source = theme === "dark" ? image.dataset.themeDark : image.dataset.themeLight;
+    if (image.getAttribute("src") !== source) image.src = source;
+  });
+  syncHeaderSurface(app);
   modelPreviewModule?.syncPreviewAppearance?.();
 }
 
@@ -204,19 +201,35 @@ function prepareRouteMotion(routeChanged) {
   }
 }
 
-const savedDraft = jobsService.getDraft();
-if (savedDraft) {
-  Object.assign(state.wizard, savedDraft, {
-    notes: normalizeOptionalNote(savedDraft.notes),
-    step: 1,
-    file: null,
-    modelFile: null,
-    previewStatus: "empty",
-    fileFeedback: "",
-    makerWorldPreview: null,
-    makerWorldPreviewStatus: "idle",
-    submittedJob: null,
-  });
+let sessionIdentity = authService.getCurrentIdentity()?.id || null;
+let sessionRevision = 0;
+async function loadOwnedDraft() {
+  const actor = authService.getCurrentIdentity()?.id;
+  if (!actor) return;
+  try {
+    const saved = await jobsService.getDraft();
+    if (actor === authService.getCurrentIdentity()?.id && saved) state.wizard = restoreWizard(saved);
+  } catch (error) { reportServiceError(error); }
+}
+async function sessionChanged() {
+  const revision = ++sessionRevision;
+  const next = authService.getCurrentIdentity()?.id || null;
+  if (next !== sessionIdentity) {
+    sessionIdentity = next;
+    ++renderRevision;
+    clearTimeout(makerWorldPreviewTimer);
+    makerWorldPreviewController?.abort();
+    modelPreviewModule?.disposeModelPreview();
+    disposeJobFiles();
+    document.querySelectorAll("dialog").forEach(dialog => { dialog.close(); dialog.remove(); });
+    state.wizard = freshWizard();
+    state.hoursStaffSearch = "";
+    state.hoursEditingId = "";
+    app.replaceChildren();
+    resetInboxSession();
+    await loadOwnedDraft();
+  }
+  if (revision === sessionRevision) await render();
 }
 
 function makerWorldDesignId(value) {
@@ -311,7 +324,7 @@ function scheduleMakerWorldPreview(value) {
   makerWorldPreviewController?.abort();
   makerWorldPreviewController = null;
   const requestedUrl = String(value || "").trim();
-  const designId = makerWorldDesignId(requestedUrl);
+  const designId = filesService.inspectUrl(requestedUrl).valid ? makerWorldDesignId(requestedUrl) : "";
   state.wizard.makerWorldPreview = null;
   state.wizard.makerWorldPreviewStatus = designId ? "loading" : (requestedUrl ? "unsupported" : "idle");
   makerWorldPreviewTimer = setTimeout(async () => {
@@ -351,43 +364,39 @@ function scheduleMakerWorldPreview(value) {
   }, 650);
 }
 
-function parseRoute() {
-  const rawValue = location.hash.slice(1) || "/";
-  const value = rawValue.split("?")[0];
+function parseRoute() { return parseHashRoute(location.hash); }
 
-  const section = value.match(/^\/section\/([^/?#]+)/);
-  if (section) {
-    const sectionId = decodeURIComponent(section[1]);
-    return { page: "home", section: sectionId === "faq" ? "faq" : "" };
-  }
-
-  const detail = value.match(/^\/staff\/jobs\/([^/?#]+)/);
-  if (detail) {
-    return { page: "job", id: decodeRouteId(detail[1]) };
-  }
-
-  if (value === "/staff/materials/new") return { page: "material-new" };
-  const filament = value.match(/^\/staff\/materials\/([^/?#]+)$/);
-  if (filament) return { page: "filament", id: decodeRouteId(filament[1]) };
-
-  if (value === "/get-started") return { page: "get-started" };
-  const ownDetail = value.match(/^\/my-jobs\/([^/?#]+)$/);
-  if (ownDetail) return { page: "my-job", id: decodeRouteId(ownDetail[1]) };
-  if (value === "/my-jobs") return { page: "my-jobs" };
-  if (value === "/staff" || value === "/staff/") return { page: "staff" };
-  if (value === "/staff/queue") return { page: "staff", redirect: true };
-  if (value === "/staff/active") return { page: "active" };
-  if (value === "/staff/materials") return { page: "materials" };
-  const hoursStaff = value.match(/^\/staff\/hours\/staff\/([^/?#]+)$/);
-  if (hoursStaff) return { page: "hours", staffId: decodeRouteId(hoursStaff[1]) };
-  if (value === "/staff/hours") return { page: "hours" };
-  if (value === "/staff/contributions") return { page: "hours", legacyContributionsRoute: true };
-
-  return { page: "home" };
+function messagePage(title, message, action = "retry-page", label = "Retry") {
+  return `${publicHeader(state)}<main class="page-shell my-jobs"><div class="empty-state"><h1>${esc(title)}</h1><p role="alert">${esc(message)}</p>${action ? `<button class="button button-outline" data-action="${action}">${label}</button>` : '<a class="button button-outline" href="#/">Back home</a>'}</div></main>${footer()}`;
 }
-
 async function render() {
   const revision = ++renderRevision;
+  const status = authService.getState().status;
+  if (status !== "signed-in") {
+    const messages = { loading: ["Loading session…", "Checking your session with the server."], "signed-out": ["Signed out", "No authenticated session is available. Google sign-in will be connected by the future backend."], "expired-session": ["Session expired", "Reload your session before continuing. Unconfirmed changes need to be checked with the server."], error: ["Session unavailable", "The server could not verify your session. Check your connection and retry."] };
+    document.querySelector("#service-loading")?.remove();
+    app.removeAttribute("aria-busy");
+    const [title, message] = messages[status] || messages.error;
+    commitPage(app, messagePage(title, message, status === "loading" ? "" : "reload-session", "Check session"));
+    syncAppearanceControls();
+    return;
+  }
+  app.setAttribute("aria-busy", "true");
+  let loading = document.querySelector("#service-loading");
+  if (!loading) { loading = document.createElement("p"); loading.id = "service-loading"; loading.setAttribute("role", "status"); document.body.append(loading); }
+  loading.textContent = "Loading…";
+  try { await renderPage(revision); }
+  catch (error) {
+    if (revision === renderRevision) {
+      commitPage(app, messagePage(error.code === "permission_denied" ? "Access restricted" : error.code === "conflict" ? "Record changed" : "Page unavailable", errorMessage(error)));
+      syncAppearanceControls();
+    }
+  } finally {
+    if (revision === renderRevision) { app.removeAttribute("aria-busy"); loading.remove(); }
+  }
+}
+async function renderPage(revision) {
+
   clearRouteMotion();
   disposeJobFiles();
   modelPreviewModule?.disposeModelPreview();
@@ -395,7 +404,7 @@ async function render() {
   if (route.page === "get-started" && state.wizard.linkUrl.trim() && state.wizard.makerWorldPreviewStatus === "idle") {
     scheduleMakerWorldPreview(state.wizard.linkUrl);
   }
-  const routeKey = `${route.page}:${route.id || ""}:${route.staffId || ""}`;
+  const routeKey = `${route.page}:${route.id || ""}:${route.staffId || ""}:${route.section || ""}`;
   const routeChanged = routeKey !== lastRenderedRouteKey;
   lastRenderedRouteKey = routeKey;
   if (route.redirect) {
@@ -406,7 +415,7 @@ async function render() {
     ? PERMISSIONS.HOURS_ADMIN
     : ROUTE_PERMISSIONS[route.page];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    document.title = "Access restricted · 3D Print Farm · v2.3";
+    document.title = "Access restricted · 3D Print Farm · v2.4";
     commitPage(app, accessDeniedPage(state, requiredPermission));
     syncSidebarState(app);
     syncSidebarSelection(app);
@@ -417,20 +426,22 @@ async function render() {
     window.scrollTo({ top: 0, behavior: "auto" });
     return;
   }
-  const staffPages = ["staff", "active", "materials", "material-new", "filament", "hours", "job"];
+  const staffPages = ["jobs", "staff", "active", "materials", "material-new", "filament", "hours", "job"];
 
   if (staffPages.includes(route.page)) {
-    document.title = "Staff Portal · School 3D Print Farm — v2.3";
+    document.title = "Staff Portal · School 3D Print Farm — v2.4";
   } else if (route.page === "get-started") {
-    document.title = "Get Started · School 3D Print Farm — v2.3";
+    document.title = "Get Started · School 3D Print Farm — v2.4";
   } else if (["my-jobs", "my-job"].includes(route.page)) {
-    document.title = "My Print Jobs · School 3D Print Farm — v2.3";
+    document.title = "My Print Jobs · School 3D Print Farm — v2.4";
   } else {
-    document.title = "School 3D Print Farm Website — v2.3";
+    document.title = "School 3D Print Farm Website — v2.4";
   }
 
   let pageHtml;
-  if (route.page === "home") {
+  if (route.page === "not-found") {
+    pageHtml = messagePage("Page not found", "This address is invalid or no longer exists.", "");
+  } else if (route.page === "home") {
     pageHtml = homePage(route.section, state, await inventoryService.listInventory());
   } else if (route.page === "get-started") {
     pageHtml = await getStartedPage(state);
@@ -440,6 +451,9 @@ async function render() {
     pageHtml = await myJobDetailsPage(state, route.id);
   } else if (route.page === "staff") {
     pageHtml = await staffOverview();
+  } else if (route.page === "jobs") {
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    pageHtml = await staffJobsPage({ search: params.get("search") || "", status: params.get("status") || "ALL", material: params.get("material") || "ALL", sort: params.get("sort") || "newest", page: Math.max(1, Number(params.get("page")) || 1) });
   } else if (route.page === "active") {
     pageHtml = await activeJobsPage();
   } else if (route.page === "materials") {
@@ -455,6 +469,14 @@ async function render() {
   }
   if (revision !== renderRevision) return;
   commitPage(app, pageHtml);
+  const diagnostics = diagnosticsService.getStatus();
+  if (diagnostics.issues.length) {
+    const banner = document.createElement("aside");
+    banner.className = "storage-recovery";
+    banner.setAttribute("role", "alert");
+    banner.innerHTML = `<strong>Saved data needs attention</strong><p>${esc(diagnostics.issues.join(" "))}</p><p>Recoverable records remain visible. Export the saved data and resolve the listed issue before recovery.</p><button class="button button-outline" data-action="export-demo-data">Export saved data</button>`;
+    app.prepend(banner);
+  }
   syncSidebarState(app);
   syncSidebarSelection(app);
   syncFloatingControls(app);
@@ -529,6 +551,19 @@ function toast(message, kind = "success") {
   }, 3600);
 }
 
+function reportServiceError(error) {
+  toast(errorMessage(error), "error");
+  if (error?.code === "conflict" && !app.querySelector(".conflict-notice")) {
+    const notice = document.createElement("aside");
+    notice.className = "storage-recovery conflict-notice";
+    notice.setAttribute("role", "alert");
+    notice.innerHTML = '<strong>Record changed</strong><p>Review the latest record before saving again. Refreshing replaces the current form with server values.</p><button class="button button-outline" data-action="retry-page">Refresh record</button>';
+    app.prepend(notice);
+  }
+  const field = error?.field || Object.keys(error?.fields || {})[0];
+  if (field) app.querySelector(`[name="${CSS.escape(field)}"], [data-field="${CSS.escape(field)}"]`)?.focus();
+}
+
 async function setFile(file) {
   if (!file) return;
   state.wizard.linkUrl = "";
@@ -565,7 +600,7 @@ function openCompletionDialog(job) {
   <div class="dialog-top">\
     <div>\
       <span class="eyebrow">\
-        COMPLETE DEMO JOB\
+        ${authService.mode === "demo" ? "COMPLETE DEMO JOB" : "COMPLETE JOB"}\
       </span>\
       <h2>\
         Ready for pickup?\
@@ -596,7 +631,7 @@ function openCompletionDialog(job) {
       ${esc(job.recipientEmail)}\
     </strong>\
     <small>\
-      Fictional demo recipient\
+      ${authService.mode === "demo" ? "Fictional demo recipient" : "Request recipient"}\
     </small>\
   </div>\
   <label class="notification-choice">\
@@ -612,7 +647,7 @@ function openCompletionDialog(job) {
   </label>\
   <div class="email-preview" id="email-preview" hidden>\
     <span class="eyebrow">\
-      EMAIL PREVIEW · DEMO\
+      ${authService.mode === "demo" ? "EMAIL PREVIEW · DEMO" : "PICKUP NOTIFICATION"}\
     </span>\
     <strong>\
       Subject: Your 3D print is ready for pickup\
@@ -665,7 +700,7 @@ function openCompletionDialog(job) {
     if (!authService.can(PERMISSIONS.JOBS_MANAGE)) {
       dialog.close();
       dialog.remove();
-      toast("Access denied: this demo identity cannot manage print jobs.", "error");
+      toast("Access denied: this account cannot manage print jobs.", "error");
       return;
     }
     submitButton.disabled = true;
@@ -681,13 +716,13 @@ function openCompletionDialog(job) {
       dialog.remove();
       toast(
         result.notification
-          ? "Job completed. Pickup notification simulated locally."
+          ? (authService.mode === "demo" ? "Job completed. Pickup notification simulated locally." : "Job completed. The server recorded the notification request.")
           : "Job completed without creating a notification.",
       );
       await render();
     } catch (error) {
       submitButton.disabled = false;
-      toast(error.message || "Could not complete this job.", "error");
+      reportServiceError(error);
     }
   });
 
@@ -701,20 +736,32 @@ function openCompletionDialog(job) {
   });
 }
 
+const pendingActions = new Set();
 async function doAction(action, target) {
   const id = target.dataset.id;
   const requiredPermission = ACTION_PERMISSIONS[action];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    toast("Access denied: this demo identity cannot " + (PERMISSION_LABELS[requiredPermission] || "perform that action") + ".", "error");
+    toast("Access denied: this account cannot " + (PERMISSION_LABELS[requiredPermission] || "perform that action") + ".", "error");
     return;
   }
 
+  const lockKey = `${action}:${id || ""}`;
+  if (pendingActions.has(lockKey)) return;
+  pendingActions.add(lockKey);
+  const wasDisabled = target.disabled;
+  target.disabled = true;
   try {
+    if (action === "retry-page") { await refreshService.reload?.(); await render(); return; }
+    if (action === "reload-session") { await authService.load(); await render(); return; }
+    if (action === "export-demo-data") {
+      const url = URL.createObjectURL(new Blob([diagnosticsService.exportData()], { type: "application/json" }));
+      const link = document.createElement("a"); link.href = url; link.download = "print-farm-demo-recovery.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); return;
+    }
     if (action === "toggle-sidebar") {
       toggleSidebar(app);
       return;
     } else if (["preview-job-file", "download-job-file", "reset-job-camera"].includes(action)) {
-      if (!authService.can(PERMISSIONS.JOBS_MANAGE) || !await jobsService.getJob(id)) throw new Error("This job is no longer available to this demo identity.");
+      if (!authService.can(PERMISSIONS.JOBS_MANAGE) || !await jobsService.getJob(id)) throw new Error("This job is no longer available to this account.");
       if (action === "preview-job-file") await previewJobFile(Number(target.dataset.index), id);
       else if (action === "download-job-file") downloadJobFile(Number(target.dataset.index), id);
       else resetJobCamera(id);
@@ -728,8 +775,7 @@ async function doAction(action, target) {
     } else if (action === "switch-role") {
       target.closest(".role-switcher")?.removeAttribute("open");
       if (!authService.switchRole(target.dataset.identityId)) throw new Error("That demonstration identity is unavailable.");
-      await syncPersonalInbox(app);
-      await render();
+      return;
     } else if (action === "set-theme") {
       if (THEME_IDS.has(target.dataset.theme)) applyAppearance({ theme: target.dataset.theme });
       return;
@@ -791,7 +837,7 @@ async function doAction(action, target) {
       openCompletionDialog(job);
     } else if (action === "retry-notification") {
       await notificationsService.retry(id);
-      toast("Demo notification retry marked as simulated sent.");
+      toast(authService.mode === "demo" ? "Demo notification retry queued locally." : "Notification retry recorded by the server.");
       await render();
     } else if (action === "hours-edit") {
       state.hoursEditingId = id;
@@ -821,6 +867,10 @@ async function doAction(action, target) {
       dialog?.remove();
     } else if (action === "wizard-next") {
       const hasModelLink = Boolean(state.wizard.linkUrl.trim());
+      if (state.wizard.step === 1 && hasModelLink) {
+        const result = filesService.inspectUrl(state.wizard.linkUrl);
+        if (!result.valid) throw new Error(result.error);
+      }
       if (state.wizard.step === 1 && !hasModelLink && (!state.wizard.file || !state.wizard.modelFile)) {
         toast("Choose an STL, 3MF, or OBJ file, or paste a model link.", "error");
         document.querySelector("#model-file")?.focus();
@@ -836,6 +886,9 @@ async function doAction(action, target) {
         if (!selection || !selection.available || !selection.hexColor) {
           toast("That filament is no longer available. Choose a current option or ask staff to verify its color.", "error");
           state.wizard.inventoryId = "";
+          state.wizard.material = "";
+          state.wizard.color = "";
+          state.wizard.selectionError = "Your selected filament is no longer available. Choose a current colour.";
           await render();
           return;
         }
@@ -870,64 +923,74 @@ async function doAction(action, target) {
       makerWorldPreviewController?.abort();
       await render();
     } else if (action === "save-draft") {
-      const { file, modelFile, previewStatus, fileFeedback, makerWorldPreview, makerWorldPreviewStatus, submittedJob, step, ...fields } = state.wizard;
-      if (jobsService.saveDraft(fields)) {
-        toast("Draft saved on this device. Model links are saved; local files must be chosen again.");
+      const fields = draftFields(state.wizard);
+      if (await jobsService.saveDraft(fields)) {
+        toast(authService.mode === "demo" ? "Draft saved on this device. Local files must be chosen again." : "Draft saved by the server. Local files must be chosen again.");
       } else {
         toast("Draft could not be saved in this browser.", "error");
       }
     } else if (action === "discard-draft") {
-      jobsService.discardDraft();
+      await jobsService.discardDraft();
       toast("Saved draft discarded.");
     } else if (action === "submit-request") {
       if (state.wizard.submitting) return;
       state.wizard.submitting = true;
+      target.textContent = "Submitting…";
+      target.setAttribute("aria-busy", "true");
 
+      const wizard = state.wizard;
+      const actor = authService.getCurrentIdentity()?.id;
       try {
         const { modelFile, previewStatus, fileFeedback, linkUrl, makerWorldPreview, makerWorldPreviewStatus, ...request } = state.wizard;
         request.notes = normalizeOptionalNote(request.notes);
         const job = await jobsService.createJob({ ...request, modelUrl: linkUrl.trim(), file: state.wizard.file, modelFiles: state.wizard.modelFile ? [state.wizard.modelFile] : [] });
+        if (wizard !== state.wizard || actor !== authService.getCurrentIdentity()?.id) return;
         state.wizard.submittedJob = job;
         state.wizard.submitting = false;
-        jobsService.discardDraft();
-        toast("Demo request added locally.");
+        try { await jobsService.discardDraft(); } catch (error) { toast(`Request saved. ${errorMessage(error)}`, "error"); }
+        toast(authService.mode === "demo" ? "Demo request added locally." : "Print request submitted.");
         await render();
       } catch (error) {
+        if (wizard !== state.wizard) return;
         state.wizard.submitting = false;
-        toast(error.message || "Review the request details.", "error");
+        target.textContent = "Submit request";
+        target.removeAttribute("aria-busy");
+        reportServiceError(error);
       }
     } else if (action === "new-request") {
-      jobsService.discardDraft();
-      state.wizard = {
-        step: 1,
-        file: null,
-        modelFile: null,
-        previewStatus: "empty",
-        fileFeedback: "",
-        linkUrl: "",
-        makerWorldPreview: null,
-        makerWorldPreviewStatus: "idle",
-        projectName: "",
-        purpose: "Personal project",
-        notes: "",
-        material: "",
-        color: "",
-        submittedJob: null,
-      };
+      await jobsService.discardDraft();
+      state.wizard = freshWizard();
       await render();
     } else if (action === "menu-toggle") {
       state.menuOpen = !state.menuOpen;
-      await render();
+      target.setAttribute("aria-expanded", String(state.menuOpen));
+      target.setAttribute("aria-label", `${state.menuOpen ? "Close" : "Open"} navigation`);
 
     }
   } catch (error) {
     if (action === "reset-local-data") target.disabled = false;
-    toast(error.message || "The action could not be completed.", "error");
-  }
+    reportServiceError(error);
+  } finally { pendingActions.delete(lockKey); if (target.isConnected) target.disabled = wasDisabled; }
 }
+
+app.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !state.menuOpen) return;
+  const toggle = app.querySelector('[data-action="menu-toggle"]');
+  if (!toggle) return;
+  state.menuOpen = false;
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-label", "Open navigation");
+  toggle.focus();
+  event.preventDefault();
+});
 
 app.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
+  if (target?.dataset.action === "skip-main") {
+    const main = app.querySelector("main");
+    if (main) { main.tabIndex = -1; main.focus(); }
+    return;
+  }
   if (!target) return;
 
   const action = target.dataset.action;
@@ -945,10 +1008,14 @@ app.addEventListener("submit", async (event) => {
   const action = form.dataset.form;
   const requiredPermission = FORM_PERMISSIONS[action];
   if (requiredPermission && !authService.can(requiredPermission)) {
-    toast("Access denied: this demo identity cannot " + (PERMISSION_LABELS[requiredPermission] || "submit that form") + ".", "error");
+    toast("Access denied: this account cannot " + (PERMISSION_LABELS[requiredPermission] || "submit that form") + ".", "error");
     return;
   }
 
+  if (action === "staff-jobs-filter") {
+    location.hash = `#/staff/jobs?${new URLSearchParams({ ...values, page: "1" }).toString()}`;
+    await render(); return;
+  }
   if (action === "hours-filter") {
     if (values.from && values.to && values.from > values.to) {
       toast("The start date must be before the end date.", "error");
@@ -1050,7 +1117,7 @@ app.addEventListener("submit", async (event) => {
   } catch (error) {
     form.dataset.saving = "false";
     if (submitButton) submitButton.disabled = false;
-    toast(error.message || "The change could not be saved.", "error");
+    reportServiceError(error);
   }
 });
 
@@ -1076,6 +1143,7 @@ function updateHoursPreview(form) {
 
 app.addEventListener("input", (event) => {
   const target = event.target;
+  if (target.form) target.form.dataset.dirty = "true";
 
   if (target.matches("[data-hours-preview-input]")) updateHoursPreview(target.form);
 
@@ -1122,6 +1190,7 @@ app.addEventListener("input", (event) => {
 
 app.addEventListener("change", async (event) => {
   const target = event.target;
+  if (target.form) target.form.dataset.dirty = "true";
 
   if (target.matches("[data-hours-preview-input]")) updateHoursPreview(target.form);
 
@@ -1194,18 +1263,6 @@ window.addEventListener("hashchange", () => {
 
 window.addEventListener("storage", async (event) => {
   if (event.key === SIDEBAR_STORAGE_KEY) { syncSidebarState(app); return; }
-  if (event.key === "three-d-print-farm-demo-v3" && event.newValue === null) {
-    window.location.reload();
-    return;
-  }
-  if (event.key === DEMO_ROLE_STORAGE_KEY) {
-    await render();
-    return;
-  }
-  if (event.key === DEMO_ACCOUNTS_STORAGE_KEY) {
-    await render();
-    return;
-  }
   if (event.key === THEME_STORAGE_KEY) {
     applyAppearance({
       theme: THEME_IDS.has(event.newValue) ? event.newValue : systemTheme(),
@@ -1213,15 +1270,23 @@ window.addEventListener("storage", async (event) => {
     });
     return;
   }
-  if (event.key !== "three-d-print-farm-demo-v3") return;
-  await jobsService.refreshFromStorage();
-  await render();
+ });
+const unsubscribeSession = authService.subscribe(() => void sessionChanged().catch(error => toast(errorMessage(error), "error")));
+const unsubscribeRefresh = refreshService.subscribe(async () => {
+  try {
+    await refreshService.refresh();
+    // Keep unfinished forms and the model preview intact during background refreshes.
+    if (parseRoute().page === "get-started" || document.activeElement?.closest("form") || app.querySelector('form[data-dirty="true"]') || document.querySelector("dialog[open]")) await syncPersonalInbox(app);
+    else await render();
+  } catch (error) { reportServiceError(error); }
 });
-window.addEventListener("printfarm:updated", render);
-window.addEventListener("printfarm:inbox-updated", () => {
-  void syncPersonalInbox(app).catch((error) => toast(error.message, "error"));
-});
+window.addEventListener("pagehide", event => { if (!event.persisted) { unsubscribeSession(); unsubscribeRefresh(); } modelPreviewModule?.disposeModelPreview(); disposeJobFiles(); });
+window.addEventListener("pageshow", event => { if (event.persisted) void authService.load().then(render); });
+window.addEventListener("printfarm:inbox-updated", () => void syncPersonalInbox(app).catch(error => toast(errorMessage(error), "error")));
 bindPersonalInbox(app, (message) => toast(message, "error"));
 
 syncAppearanceControls();
-render();
+await render();
+await authService.load();
+await loadOwnedDraft();
+await render();

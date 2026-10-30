@@ -11,7 +11,7 @@ const { jobProgress } = await import("../src/jobProgress.js?v=2.2&rev=5");
 const { jobDetailsPage, staffOverview, activeJobsPage } = await import("../src/staffPages.js?v=2.2&rev=5");
 const select = (n) => auth.switchRole(`demo-person-${String(n).padStart(2, "0")}`);
 const read = () => JSON.parse(data.get(key));
-const request = { projectName: "QA bracket", file: { name: "part.stl", sizeBytes: 256 }, inventoryId: "qa-pla", material: "PLA", color: "Gray", notes: "Print upright" };
+const request = { projectName: "QA bracket", modelUrl: "https://example.com/part.stl", inventoryId: "qa-pla", material: "PLA", color: "Gray", notes: "Print upright" };
 beforeEach(() => {
   data.clear(); auth.resetSession();
   data.set(key, JSON.stringify({ jobs: [], notifications: [], inventory: [{ id: "qa-pla", material: "PLA", color: "Gray", hexColor: "#808080", lowStock: false, available: true }], contributions: [], hours: { transactions: [], requests: [] } }));
@@ -22,7 +22,7 @@ beforeEach(() => {
   } } } });
 });
 async function approveNew() {
-  select(1); const job = await jobs.createJob(request);
+  select(1); const job = await jobs.createJob({ ...request, submissionKey: crypto.randomUUID() });
   select(4); await jobs.reviewRequest(job.id, "approved");
   return job;
 }
@@ -30,7 +30,7 @@ async function prepare() {
   const job = await approveNew(); select(2); await jobs.claimJob(job.id); return job;
 }
 test("pending requests are hidden from every staff list, filter, summary, detail, history and direct claim", async () => {
-  const job = await jobs.createJob(request);
+  const job = await jobs.createJob({ ...request, submissionKey: crypto.randomUUID() });
   for (const n of [2,3,5,6]) {
     select(n);
     assert.deepEqual(await jobs.listJobs(), []);
@@ -88,7 +88,7 @@ test("authorization gate, required revisions, resubmission and stale supervisor 
   assert.ok(firstAttempt);
 });
 test("rejection remains private to supervisors and owning submitter, with a saved reason", async () => {
-  const job = await jobs.createJob(request);
+  const job = await jobs.createJob({ ...request, submissionKey: crypto.randomUUID() });
   select(4); await assert.rejects(jobs.reviewRequest(job.id, "rejected"), /reason/);
   await jobs.reviewRequest(job.id, "rejected", "Wall thickness needs adjustment");
   select(2); assert.equal(await jobs.getJob(job.id), null);
@@ -135,7 +135,7 @@ test("presence belongs to each supervisor, persists, and is read-only for member
 });
 test("each supervisor can review shared requests once; notification actions cannot repeat a decision", async () => {
   select(4); const second = auth.createDemoAccount({ name: "QA Supervisor", roleId: "print_farm_teacher" });
-  select(1); const job = await jobs.createJob(request);
+  select(1); const job = await jobs.createJob({ ...request, submissionKey: crypto.randomUUID() });
   select(4); assert.equal((await inbox.list()).length, 1); await jobs.reviewRequest(job.id, "approved");
   auth.switchRole(second.id); assert.equal((await inbox.list()).length, 1);
   await assert.rejects(jobs.reviewRequest(job.id, "rejected", "obsolete"), /already been reviewed/);
@@ -158,7 +158,7 @@ test("hours requests, direct credits and approvals generate one alert each and p
   select(3); assert.deepEqual(await inbox.list(), []);
 });
 test("legacy records retain progress, lack invented approval dates and still require final authorization", async () => {
-  const created = await jobs.createJob(request); const saved = read();
+  const created = await jobs.createJob({ ...request, submissionKey: crypto.randomUUID() }); const saved = read();
   Object.assign(saved.jobs[0], { status: "IN_PROGRESS", assignedStaff: "Leddy Tiang", history: [] });
   delete saved.jobs[0].initialApproval; data.set(key, JSON.stringify(saved));
   select(2); const legacy = await jobs.getJob(created.id);

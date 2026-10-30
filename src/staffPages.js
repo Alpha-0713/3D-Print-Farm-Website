@@ -2,7 +2,7 @@ import { sidebarCollapsed } from "./sidebarState.js?v=2.3";
 import { jobModelFiles } from "./jobModelFiles.js?v=2.3";
 import { claimable, isAssignedTo } from "./jobWorkflow.js?v=2.2&rev=5";
 import { MATERIALS } from "./data.js?v=2.2&rev=5";
-import { contributionsService, inventoryService, jobsService } from "./services.js?v=2.2&rev=5";
+import { contributionsService, inventoryService, jobsService, directoryService } from "./services.js?v=2.2&rev=5";
 import { notificationsService } from "./notificationsService.js?v=2.2&rev=5";
 import { toolbarControls, dateTime, esc, logo, localDataControls, shortDate, statusBadge } from "./pageShared.js?v=2.2&rev=5";
 import { authService } from "./authService.js?v=2.2&rev=5";
@@ -12,11 +12,12 @@ import { PERMISSIONS, ROLES } from "./authorization.js?v=2.2&rev=5";
 export function staffShell(content, active = "overview") {
   const icons = {
     overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    jobs: '<path d="M5 5h14M5 12h14M5 19h14"/>',
     active: '<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M18 12h.01"/>',
     materials: '<path d="m12 3 10 5-10 5L2 8l10-5ZM2 12l10 5 10-5M2 16l10 5 10-5"/>',
     hours: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5h5"/>',
   };
-  const links = [["overview", "Overview", "#/staff"], ["active", "My active jobs", "#/staff/active"], ["materials", "Materials", "#/staff/materials"], ["hours", "Hours", "#/staff/hours"]]
+  const links = [["overview", "Overview", "#/staff"], ["jobs", "All jobs", "#/staff/jobs"], ["active", "My active jobs", "#/staff/active"], ["materials", "Materials", "#/staff/materials"], ["hours", "Hours", "#/staff/hours"]]
     .filter(([id]) => id !== "materials" || authService.can(PERMISSIONS.FILAMENT_VIEW));
   const activeNavigation = active === "material-new" ? "materials" : active;
   const identity = authService.getCurrentIdentity();
@@ -129,8 +130,8 @@ ${jobs.some(claimable) ? `<section class="staff-section available-jobs"><div cla
 <section class="staff-section">\
   <div class="staff-section-head">\
     <div>\
-      <h2>Recent jobs</h2>\
-      <p>Latest activity across all demo requests</p>\
+      <h2>Recent jobs</h2><a class="text-link" href="#/staff/jobs">View all jobs →</a>\
+      <p>Latest request activity</p>\
     </div>\
   </div>\
   ${jobTable(jobs.slice(0, 6))}\
@@ -140,7 +141,7 @@ ${jobs.some(claimable) ? `<section class="staff-section available-jobs"><div cla
     ⓘ\
   </span>\
   <p>\
-    All records and actions in this workspace are local demo data. No printer is controlled and no message is sent.\
+    ${authService.mode === "demo" ? "All records and actions in this workspace are local demo data. No printer is controlled and no message is sent." : "API workspace · Job status records are managed by the connected server."}\
   </p>\
 </div>`, "overview");
 }
@@ -157,11 +158,11 @@ export async function activeJobsPage() {
       My active jobs\
     </h1>\
     <p>\
-      Requests currently assigned to the simulated staff profile.\
+      Requests currently assigned to your profile.\
     </p>\
   </div>\
   <span class="demo-pill">\
-    ${esc(identity.name)} · DEMO\
+    ${esc(identity.name)} · ${authService.mode.toUpperCase()}\
   </span>\
 </div>\
 ${jobs.length ? `<div class="active-jobs-grid">\
@@ -286,7 +287,7 @@ export async function jobDetailsPage(jobId) {
     Job not found\
   </h2>\
   <p>\
-    This demo job may have been removed or the link is invalid.\
+    This job may have been removed or the link is invalid.\
   </p>\
   <a class="button button-outline" href="#/staff">\
     Back to Overview\
@@ -305,7 +306,7 @@ export async function jobDetailsPage(jobId) {
     : job.status === "PRINTING" && responsible ? button("complete-job", "Mark ready for pickup") : "";
   const collectionAction = job.status === "COMPLETED" ? `<button class="button button-lime" data-action="collect-job" data-id="${esc(job.id)}">Mark as collected <span>✓</span></button>` : "";
   const canReassign = authService.can(PERMISSIONS.JOBS_REASSIGN);
-  const reassignTargets = authService.getDemoIdentities().filter((identity) => (
+  const reassignTargets = (await directoryService.listStaff()).filter((identity) => (
     ROLES[identity.roleId]?.level >= 2 && identity.name !== job.assignedStaff
   ));
   const reassignForm = canReassign && !["COMPLETED", "COLLECTED", "CANCELLED", "REJECTED"].includes(job.status) && job.assignedStaff && reassignTargets.length
@@ -342,7 +343,7 @@ export async function jobDetailsPage(jobId) {
     </small>\
   </div>\
   <span class="notification-status notification-${item.status.toLowerCase()}">\
-    ${item.status} · DEMO\
+    ${esc(item.status)}${authService.mode === "demo" ? " · DEMO" : ""}\
   </span>\
   ${item.status === "FAILED" ? `<button class="button button-outline button-small" data-action="retry-notification" data-id="${esc(item.id)}">\
   Retry simulation\
@@ -363,7 +364,7 @@ export async function jobDetailsPage(jobId) {
 <div class="detail-title-row">\
   <div>\
     <span class="eyebrow">\
-      JOB DETAILS / LOCAL DEMO\
+      JOB DETAILS / ${authService.mode === "demo" ? "LOCAL DEMO" : "API WORKSPACE"}\
     </span>\
     <h1>\
       ${esc(job.projectName)}\
@@ -402,7 +403,7 @@ export async function jobDetailsPage(jobId) {
             ${esc(job.fileName)}\
           </strong>\
           <small>\
-            ${job.modelUrl ? "Link included with request" : `${esc(job.fileSize)} · ${job.attachments?.length ? "Model attachment · local demo" : "Original file unavailable"}`}\
+            ${job.modelUrl ? "Link included with request" : `${esc(job.fileSize)} · ${job.attachments?.length ? (authService.mode === "demo" ? "Model attachment · local demo" : "Stored attachment") : "Original file unavailable"}`}\
           </small>\
         </div>\
         <span class="material-chip">\
@@ -451,4 +452,19 @@ export async function jobDetailsPage(jobId) {
     </div>\
   </aside>\
 </div>`, isAssignedTo(job, authService.getCurrentIdentity()) ? "active" : "overview");
+}
+
+export async function staffJobsPage(filters = {}) {
+  const result = await jobsService.listPage({ ...filters, pageSize: 20 });
+  const statuses = jobsService.availableStatuses();
+  const link = number => `#/staff/jobs?${new URLSearchParams({ ...filters, page: number }).toString()}`;
+  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / JOBS</span><h1>All jobs</h1><p>Search current and older jobs available to your access level.</p></div></div>
+    <form class="job-list-filters" data-form="staff-jobs-filter">
+      <label class="field"><span>Search jobs</span><input name="search" type="search" maxlength="100" value="${esc(filters.search || "")}" placeholder="Job, project or submitter" /></label>
+      <label class="field"><span>Status</span><select name="status"><option value="ALL">All statuses</option>${statuses.map(status => `<option value="${status}" ${filters.status === status ? "selected" : ""}>${status.replaceAll("_", " ")}</option>`).join("")}</select></label>
+      <label class="field"><span>Material</span><select name="material"><option value="ALL">All materials</option>${MATERIALS.map(material => `<option ${filters.material === material.id ? "selected" : ""}>${esc(material.id)}</option>`).join("")}</select></label>
+      <label class="field"><span>Order</span><select name="sort">${[["newest", "Newest first"], ["oldest", "Oldest first"], ["project", "Project name"]].map(([value, label]) => `<option value="${value}" ${filters.sort === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+      <button type="submit" class="button button-outline">Apply filters</button>
+    </form><p role="status">${result.total} matching jobs · Page ${result.page} of ${Math.max(1, Math.ceil(result.total / result.pageSize))}</p>
+    ${jobTable(result.items)}<nav class="jobs-pagination" aria-label="Job list pages">${result.page > 1 ? `<a class="button button-outline" href="${esc(link(result.page - 1))}">← Previous</a>` : ""}${result.page * result.pageSize < result.total ? `<a class="button button-outline" href="${esc(link(result.page + 1))}">Next →</a>` : ""}</nav>`, "jobs");
 }

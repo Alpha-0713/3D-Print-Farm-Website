@@ -27,7 +27,7 @@ export async function myJobsPage(state) {
     <div class="request-owner"><span>Submitted by <strong>${esc(identity.name)}</strong></span><small>${esc(identity.email)}</small></div>
     <nav class="request-filters" aria-label="Filter print jobs">${[["all", "All requests"], ["active", "In progress"], ["ready", "Ready for pickup"], ["past", "Past requests"]].map(([key, label]) => `<a href="#/my-jobs${key === "all" ? "" : `?view=${key}`}" ${view === key ? 'aria-current="page"' : ""}>${label}<span>${jobs.filter((job) => key === "all" || category(job) === key).length}</span></a>`).join("")}</nav>
     ${visible.length ? `<div class="request-list">${visible.map(jobCard).join("")}</div>` : `<div class="empty-state"><h2>${jobs.length ? "No requests in this view" : "Your first print starts here"}</h2><p>${jobs.length ? "Choose another view to see your other requests." : "Submit a model and return here for updates from the Print Farm team."}</p><a class="text-link" href="${jobs.length ? "#/my-jobs" : "#/get-started"}">${jobs.length ? "View all requests" : "Start a print request"} →</a></div>`}
-    <p class="local-data-note">Demo workspace · Requests are saved in this browser.</p>
+    <p class="local-data-note">${authService.mode === "demo" ? "Demo workspace · Requests are saved in this browser." : "API workspace · Requests are stored by the server."}</p>
   </main>${footer()}`;
 }
 
@@ -40,7 +40,7 @@ export async function myJobDetailsPage(state, jobId) {
     <div class="submitter-detail-layout"><div class="request-detail-body">
       ${pickupDetails(job)}
       <section class="request-specs"><h2>Request details</h2><dl>${[["Model", job.modelUrl || `${job.fileName} · ${job.fileSize}`], ["Material & colour", `${job.material} · ${job.color}`], ["Purpose", job.purpose || "Not specified"], ["Layer height", job.layerHeight || "Not recorded"], ["Infill", job.infill == null ? "Not recorded" : `${job.infill}%`], ["Staff member", job.assignedStaff || "Awaiting assignment"]].map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>
-      <div class="request-notes"><h3>Your project notes</h3><p>${esc(job.notes || "No additional notes.")}</p></div></section>
+      ${!job.modelUrl && !job.attachments?.length ? '<p class="local-data-note">Legacy request · filename only; no retained original is recorded.</p>' : ""}<div class="request-notes"><h3>Your project notes</h3><p>${esc(job.notes || "No additional notes.")}</p></div></section>
     </div><aside>${jobProgress(job)}</aside></div>
   </main>${footer()}`;
 }

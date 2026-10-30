@@ -1,4 +1,5 @@
-import { jobAttachments, modelFilesStore } from "./modelFilesStore.js?v=2.3";
+import { jobAttachments } from "./attachments.js";
+import { filesService } from "./filesService.js?v=2.2&rev=5";
 import { ACCEPTED_MODEL_EXTENSIONS, getModelFileExtension } from "./filesService.js?v=2.2&rev=5";
 import { esc } from "./pageShared.js?v=2.2&rev=5";
 
@@ -7,7 +8,7 @@ let controller = null;
 export function jobModelFiles(job) {
   const attachments = jobAttachments(job);
   return `<section class="detail-section job-model-files" data-job-id="${esc(job.id)}">
-    <div class="job-files-heading"><h2>Model files</h2><p>Original files saved in this browser · demonstration only</p></div>
+    <div class="job-files-heading"><h2>Model files</h2><p>${filesService.mode === "demo" ? "Original files saved in this browser · demonstration only" : "Stored original attachments"}</p></div>
     ${attachments.length ? `<ul class="job-file-list">${attachments.map((file, index) => `<li class="job-file-row" data-file-index="${index}">
       <div class="job-file-name"><strong>${esc(file.name || "Unnamed file")}</strong><small data-file-status>${file.id ? "Checking saved original…" : "Original file unavailable · this older demo record contains a filename only."}</small></div>
       <div class="job-file-actions"><button type="button" class="button button-outline button-small" data-action="preview-job-file" data-index="${index}" data-id="${esc(job.id)}" disabled aria-pressed="false" aria-label="Preview ${esc(file.name)}">Preview</button>
@@ -19,7 +20,7 @@ export function jobModelFiles(job) {
   </section>`;
 }
 
-export function disposeJobFiles() { if (controller) controller.disposed = true; controller = null; }
+export function disposeJobFiles() { if (controller) { controller.disposed = true; controller.viewer?.disposeModelPreview(); controller.files.clear(); } controller = null; }
 
 export async function mountJobFiles(root, job, loadViewer) {
   disposeJobFiles();
@@ -63,7 +64,7 @@ export async function mountJobFiles(root, job, loadViewer) {
     if (!metadata.id) return;
     const row = panel.querySelector(`[data-file-index="${index}"]`);
     try {
-      const file = await modelFilesStore.get(metadata.id);
+      const file = await filesService.get(metadata.id);
       if (!alive()) return;
       if (!file) { row.querySelector("[data-file-status]").textContent = "Original file unavailable in this browser. It may have been cleared or saved on another device."; return; }
       current.files.set(index, file);

@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apple redesign checks · v2.4</title>
+  <style>@import url("../src/fonts.css");
+    :root { color-scheme: light; font: 14px/1.5 "Inter", Arial, sans-serif; color: #1d1d1f; background: #f5f5f7; }
+    body { margin: 24px; }
+    h1 { font-size: 24px; font-weight: 600; letter-spacing: -.4px; }
+    button { min-height: 44px; padding: 11px 22px; border: 0; border-radius: 9999px; color: white; background: #0066cc; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 "Inter", Arial, sans-serif; }
+    #viewport { overflow: auto; background: #e0e0e0; margin-top: 20px; }
+    iframe { display: block; height: 1000px; width: 1440px; border: 0; background: white; }
+    .failed { color: #a11; }
+  </style>
+</head>
+<body>
+  <h1>Apple redesign checks</h1>
+  <p>Checks the production public website, request form, and job list in both themes at desktop, tablet, and phone widths. It does not submit requests, change identities, or reset saved records. Theme and sidebar preferences are restored afterward. Use a dedicated local QA origin.</p>
+  <button id="run" type="button">Run redesign checks</button>
+  <pre id="results" role="status">Ready.</pre>
+  <div id="viewport"><iframe id="app-frame" title="Production website under redesign checks"></iframe></div>
+  <script type="module">
+    const frame = document.querySelector('#app-frame');
+    const run = document.querySelector('#run');
+    const results = document.querySelector('#results');
+    const widths = [1440, 1024, 834, 768, 640, 390, 320];
+    const preferenceKeys = ['three-d-print-farm-theme', 'three-d-print-farm-sidebar-collapsed'];
+    const passed = [];
+    const doc = () => frame.contentDocument;
+    const win = () => frame.contentWindow;
+    const style = element => win().getComputedStyle(element);
+    const channels = value => value.match(/[\d.]+/g)?.map(Number) || [];
+    const headerInk = header => header.dataset.surface === 'dark' ? [255, 255, 255] : [29, 29, 31];
+    const readableInk = (element, header) => {
+      const actual = channels(style(element).color), expected = headerInk(header);
+      return actual.length >= 3 && expected.every((value, index) => Math.abs(actual[index] - value) <= 3) && (actual.length < 4 || actual[3] >= .9);
+    };
+    const headerInkElements = header => [...header.querySelectorAll('.brand, .brand svg, .public-nav a:not(.button), .toolbar-controls :is(.accent-picker, .role-switcher, .inbox-picker) > summary, .menu-toggle')].filter(visible);
+    const surfaceColor = element => {
+      for (let current = element; current; current = current.parentElement) {
+        const color = style(current).backgroundColor;
+        if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') return color;
+      }
+      return '';
+    };
+    const visible = element => Boolean(element && element.getClientRects().length && style(element).visibility !== 'hidden' && style(element).display !== 'none');
+    const settle = () => new Promise(resolve => setTimeout(resolve, 350));
+    const check = (condition, label) => {
+      if (!condition) throw new Error(label);
+      passed.push('PASS · ' + label);
+      results.textContent = passed.join('\n');
+    };
+    async function until(predicate, label) {
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 40));
+      }
+      throw new Error('Timed out: ' + label);
+    }
+    async function route(hash, selector) {
+      win().location.hash = hash;
+      await until(() => doc()?.querySelector(selector), hash);
+      await settle();
+    }
+    function noOverflow(label) {
+      const width = win().innerWidth;
+      const overflow = doc().documentElement.scrollWidth - width;
+      if (overflow > 1) {
+        const offenders = [...doc().querySelectorAll('body *')].filter(visible).filter(element => {
+          const box = element.getBoundingClientRect();
+          return box.width && (box.left < -1 || box.right > width + 1);
+        }).slice(0, 5).map(element => element.tagName.toLowerCase() + (element.className && typeof element.className === 'string' ? '.' + element.className.trim().replace(/\s+/g, '.') : ''));
+        throw new Error(label + ': ' + overflow + 'px overflow; ' + offenders.join(', '));
+      }
+      check(true, label);
+    }
+    function checkHomeDesign(theme, width) {
+      const prefix = theme + ' ' + width + 'px';
+      const header = doc().querySelector('.public-header');
+      const globalBar = header?.querySelector('.global-bar');
+      check(header && globalBar && !header.querySelector('.service-nav'), prefix + ' uses one compact global navigation bar');
+      const headerStyle = style(header);
+      const blur = headerStyle.backdropFilter || headerStyle.webkitBackdropFilter || '';
+      const reducedTransparency = win().matchMedia('(prefers-reduced-transparency: reduce), (prefers-contrast: more)').matches;
+      const supportsBlur = win().CSS?.supports('backdrop-filter', 'blur(1px)') || win().CSS?.supports('-webkit-backdrop-filter', 'blur(1px)');
+      const glass = channels(headerStyle.backgroundColor);
+      check(header.dataset.surface === theme, prefix + ' header follows the selected hero theme');
+      check(reducedTransparency || !supportsBlur || (blur.includes('blur(') && glass.length === 4 && glass[3] > 0 && glass[3] < 1), prefix + ' header uses translucent frosted glass with an accessible solid fallback');
+      const barColor = channels(style(globalBar).backgroundColor);
+      check(style(globalBar).backgroundColor === 'transparent' || (barColor.length === 4 && barColor[3] === 0), prefix + ' inner header row stays transparent so the frosted surface is not covered');
+      check([header, globalBar].every(element => {
+        const height = element.getBoundingClientRect().height;
+        return height >= 55 && height <= 57;
+      }), prefix + ' header and content remain in the same 56px row');
+      const inkElements = headerInkElements(header);
+      check(inkElements.length > 1 && inkElements.every(element => readableInk(element, header)), prefix + ' logo, navigation, and controls use readable ink over the hero');
+      const logoText = header.querySelector('.brand span');
+      check(logoText && parseFloat(style(logoText).fontSize) <= 14, prefix + ' logo uses the smaller header typography');
+      if (width > 1068) {
+        const links = [...header.querySelectorAll('.public-nav a')].filter(visible);
+        check(links.length >= 3 && links.every(element => parseFloat(style(element).fontSize) <= 12), prefix + ' desktop navigation uses compact readable text');
+        const accountActions = [...header.querySelectorAll('.nav-account-links a, .header-actions > .button')].filter(visible);
+        check(accountActions.length >= 2 && accountActions.every((element, index) => !index || element.getBoundingClientRect().left - accountActions[index - 1].getBoundingClientRect().right >= 20), prefix + ' job links, staff link, and Get Started have comfortable spacing');
+      }
+      const bodyStyle = style(doc().body);
+      check(bodyStyle.fontSize === '17px' && parseInt(bodyStyle.fontWeight, 10) === 400, prefix + ' body typography uses 17px regular text');
+      const headline = doc().querySelector('.hero h1');
+      check(headline && parseInt(style(headline).fontWeight, 10) === 600, prefix + ' hero headline uses weight 600');
+      const heroAction = doc().querySelector('.hero-actions .button');
+      const actionStyle = heroAction && style(heroAction);
+      const actionBox = heroAction?.getBoundingClientRect();
+      check(heroAction && actionStyle.backgroundColor === 'rgb(0, 102, 204)' && actionStyle.color === 'rgb(255, 255, 255)', prefix + ' primary action uses Action Blue and white');
+      check(actionBox.height >= 44 && parseFloat(actionStyle.borderTopLeftRadius) >= actionBox.height / 2, prefix + ' primary action has a pill shape and 44px touch target');
+      const chrome = [...doc().querySelectorAll('.public-header, .global-bar, .hero, .hero-visual, .printer-card, .site-footer, .button')];
+      check(chrome.every(element => style(element).boxShadow === 'none' && style(element).backgroundImage === 'none'), prefix + ' interface surfaces and controls have no decorative gradient or shadow');
+      check([...doc().querySelectorAll('.public-main > section')].every(element => parseFloat(style(element).borderTopLeftRadius) === 0), prefix + ' full-width sections keep square edges');
+      const heroVisual = doc().querySelector('.hero-visual');
+      const heroStyle = style(heroVisual);
+      const heroOverlay = win().getComputedStyle(heroVisual, '::after');
+      check(heroStyle.boxShadow === 'none' && heroStyle.transform === 'none' && heroStyle.transitionProperty === 'none' && heroStyle.cursor === 'default', prefix + ' illustrative hero image has no interactive hover treatment');
+      check(heroOverlay.display === 'none' || heroOverlay.content === 'none', prefix + ' illustrative hero image has no hover overlay');
+      const useSection = doc().querySelector('.use-cases');
+      const useCards = [...useSection.querySelectorAll('.use-grid article')];
+      check(useCards.length === 2 && surfaceColor(useSection) === 'rgb(26, 26, 28)' && useCards.every(element => surfaceColor(element) === surfaceColor(useSection)), prefix + ' both use-case panels match the darker grey section');
+      const expectedPaper = theme === 'dark' ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)';
+      const expectedAlternate = theme === 'dark' ? 'rgb(22, 22, 23)' : 'rgb(245, 245, 247)';
+      const expectedInk = theme === 'dark' ? 'rgb(245, 245, 247)' : 'rgb(29, 29, 31)';
+      check(surfaceColor(doc().querySelector('.hero')) === expectedPaper && surfaceColor(doc().querySelector('#faq')) === expectedPaper, prefix + ' hero and FAQ use the selected page surface');
+      check(surfaceColor(doc().querySelector('#printers')) === expectedAlternate && surfaceColor(doc().querySelector('.site-footer')) === expectedAlternate, prefix + ' equipment and footer use the selected alternate surface');
+      check(style(doc().querySelector('.hero h1')).color === expectedInk && style(doc().querySelector('.printer-card h3')).color === expectedInk, prefix + ' headings follow the selected theme');
+      const images = [...doc().querySelectorAll('img[data-theme-light][data-theme-dark]')];
+      check(images.length === 3 && images.every(image => image.getAttribute('src') === (theme === 'dark' ? image.dataset.themeDark : image.dataset.themeLight)), prefix + ' hero and both printers use the selected artwork');
+      const publicSections = [...doc().querySelectorAll('.public-main > section')];
+      const maximumSectionPadding = width <= 640 ? 32 : 48;
+      check(publicSections.every(element => parseFloat(style(element).paddingTop) <= maximumSectionPadding && parseFloat(style(element).paddingBottom) <= maximumSectionPadding), prefix + ' public sections use compact vertical spacing');
+      check(useCards.every(element => parseFloat(style(element).paddingTop) <= 20 && parseFloat(style(element).paddingBottom) <= 20) && parseFloat(style(doc().querySelector('.use-grid')).columnGap) <= 24, prefix + ' use-case panels keep compact insets and gutters');
+      const faqRows = [...doc().querySelectorAll('.faq-list summary')];
+      check(faqRows.every(element => { const height = element.getBoundingClientRect().height; return height >= 44 && (width <= 640 || height <= 64); }), prefix + ' FAQ rows stay compact while retaining touch targets');
+      noOverflow(prefix + ' public home fits the viewport');
+    }
+    async function checkScrolledSurface(theme, width, selector, expected, label) {
+      const header = doc().querySelector('.public-header');
+      const target = doc().querySelector(selector);
+      target.scrollIntoView({ block: 'start', behavior: 'instant' });
+      win().scrollBy({ top: header.getBoundingClientRect().height + 40, behavior: 'instant' });
+      await until(() => {
+        const box = target.getBoundingClientRect(), midpoint = header.getBoundingClientRect().height / 2;
+        return box.top <= midpoint && box.bottom > midpoint && header.dataset.surface === expected;
+      }, theme + ' ' + width + 'px ' + label + ' reaches the frosted header');
+      await settle();
+      if (selector === '#printers') {
+        await until(() => [...target.querySelectorAll('img')].every(image => image.complete && image.naturalWidth > 0), theme + ' equipment artwork loads');
+        check(true, theme + ' ' + width + 'px equipment artwork decodes successfully');
+      }
+      check(header.dataset.surface === expected && headerInkElements(header).every(element => readableInk(element, header)), theme + ' ' + width + 'px header uses ' + (expected === 'dark' ? 'white' : 'dark') + ' text over ' + label);
+      const primaryActions = [...header.querySelectorAll('a.button-lime')].filter(visible);
+      check(primaryActions.every(element => style(element).color === 'rgb(255, 255, 255)' && style(element).backgroundColor === 'rgb(0, 102, 204)'), theme + ' ' + width + 'px blue header actions keep white text over ' + label);
+    }
+    async function checkStickyHeader(theme, width) {
+      const prefix = theme + ' ' + width + 'px';
+      const anchors = () => {
+        const header = doc().querySelector('.public-header');
+        const top = header.getBoundingClientRect().top;
+        return [...header.querySelectorAll('.brand, .public-nav a, .header-actions > .button, .toolbar-controls > .appearance-controls summary, .toolbar-controls > .role-switcher > summary, .toolbar-controls > .inbox-picker > summary, .menu-toggle')].filter(visible).map(element => {
+          const box = element.getBoundingClientRect();
+          return { center: (box.top + box.bottom) / 2 - top, top: box.top - top, bottom: box.bottom - top };
+        });
+      };
+      const before = anchors();
+      await checkScrolledSurface(theme, width, '.use-cases', 'dark', 'the darker use-case section');
+      await checkMenu(theme, width, 'over dark content');
+      await checkScrolledSurface(theme, width, '#printers', theme, 'the themed printer section');
+      await checkScrolledSurface(theme, width, '#faq', theme, 'the themed FAQ section');
+      const header = doc().querySelector('.public-header');
+      const headerBox = header.getBoundingClientRect();
+      const barBox = header.querySelector('.global-bar').getBoundingClientRect();
+      const after = anchors();
+      check(Math.abs(headerBox.top) < 1 && Math.abs(barBox.top - headerBox.top) < 1 && Math.abs(barBox.bottom - headerBox.bottom) <= 1.1, prefix + ' frosted header surface stays attached to its content while scrolling');
+      check(after.length === before.length && after.every((box, index) => Math.abs(box.center - before[index].center) < 1 && box.top >= -1 && box.bottom <= 57), prefix + ' header text and controls keep their alignment above dark and light content');
+      const useSection = doc().querySelector('.use-cases');
+      const useTop = useSection.getBoundingClientRect().top + win().scrollY;
+      const headerHeight = header.getBoundingClientRect().height;
+      const scrollBoundary = async (top, expected, label) => {
+        win().scrollTo({ top, behavior: 'instant' });
+        await until(() => header.dataset.surface === expected && Math.abs(win().scrollY - top) < 2, prefix + ' ' + label);
+        await settle();
+        check(headerInkElements(header).every(element => readableInk(element, header)), prefix + ' ' + label);
+      };
+      await scrollBoundary(useTop - headerHeight - 16, theme, 'scrolling upward restores the hero navigation contrast');
+      await scrollBoundary(useTop + 16, 'dark', 'scrolling downward switches to white text after entering the dark section');
+      await scrollBoundary(useTop - headerHeight - 16, theme, 'scrolling back upward restores the hero glass treatment');
+      const originalHeight = frame.style.height;
+      const finalTile = doc().querySelector('.final-cta'), footer = doc().querySelector('.site-footer');
+      frame.style.height = Math.max(240, Math.min(500, Math.floor(finalTile.getBoundingClientRect().height + footer.getBoundingClientRect().height - headerHeight - 48))) + 'px';
+      await settle();
+      await checkScrolledSurface(theme, width, '.final-cta', 'dark', 'the final dark call to action');
+      frame.style.height = originalHeight;
+      await settle();
+      await checkScrolledSurface(theme, width, '.hero', theme, 'the themed hero when scrolling back up');
+    }
+    async function checkMenu(theme, width, surfaceLabel = 'over light content') {
+      const toggle = doc().querySelector('[data-action="menu-toggle"]');
+      if (!visible(toggle)) return;
+      check(toggle.getBoundingClientRect().height >= 44 && toggle.getBoundingClientRect().width >= 44, theme + ' ' + width + 'px mobile navigation has a 44px touch target');
+      toggle.focus();
+      toggle.click();
+      await until(() => doc().querySelector('[data-action="menu-toggle"]')?.getAttribute('aria-expanded') === 'true', 'navigation opens');
+      check(doc().activeElement === toggle && toggle.isConnected, theme + ' ' + width + 'px opening navigation preserves keyboard focus');
+      const navId = doc().querySelector('[data-action="menu-toggle"]').getAttribute('aria-controls');
+      const navigation = doc().getElementById(navId);
+      check(visible(navigation) && [...navigation.querySelectorAll('a')].some(visible), theme + ' ' + width + 'px mobile navigation opens with reachable links');
+      const header = doc().querySelector('.public-header');
+      check([...navigation.querySelectorAll('a:not(.button)')].filter(visible).every(element => readableInk(element, header)), theme + ' ' + width + 'px drawer links adapt their contrast ' + surfaceLabel);
+      if (width <= 640) check(visible(navigation.querySelector('.mobile-start-link')), theme + ' ' + width + 'px Get Started remains available in the navigation drawer');
+      noOverflow(theme + ' ' + width + 'px open mobile navigation fits the viewport');
+      doc().querySelector('[data-action="menu-toggle"]').click();
+      await until(() => doc().querySelector('[data-action="menu-toggle"]')?.getAttribute('aria-expanded') === 'false', 'navigation closes');
+      check(true, theme + ' ' + width + 'px mobile navigation closes');
+      toggle.click();
+      toggle.dispatchEvent(new (win().KeyboardEvent)('keydown', { key: 'Escape', bubbles: true }));
+      check(toggle.getAttribute('aria-expanded') === 'false' && doc().activeElement === toggle, theme + ' ' + width + 'px Escape closes navigation and returns focus');
+    }
+    run.addEventListener('click', async () => {
+      run.disabled = true;
+      passed.length = 0;
+      results.className = '';
+      results.textContent = 'Loading production website…';
+      const backup = new Map(preferenceKeys.map(key => [key, localStorage.getItem(key)]));
+      try {
+        frame.style.width = '1440px';
+        frame.src = '../index.html#/';
+        await until(() => doc()?.querySelector('.hero h1'), 'public website');
+        const printerSection = doc().querySelector('#printers');
+        check(printerSection?.textContent.includes('A1 mini') && printerSection.textContent.includes('H2S'), 'Equipment information retains both printer models');
+        check(printerSection.textContent.includes('180 × 180 × 180') && printerSection.textContent.includes('340 × 320 × 340'), 'Equipment information retains the nominal build dimensions');
+        for (const image of printerSection.querySelectorAll('img')) {
+          image.scrollIntoView({ block: 'center' });
+          await until(() => image.complete, 'equipment photograph');
+        }
+        check([...printerSection.querySelectorAll('img')].every(image => image.alt.trim() && image.complete && image.naturalWidth > 0), 'Equipment photography loads and has alternative text');
+        const equipmentDetails = [...printerSection.querySelectorAll('details')];
+        for (const details of equipmentDetails) {
+          details.querySelector('summary').click();
+          check(details.open && details.textContent.includes('guidance'), 'Equipment disclosure opens with practical guidance');
+          details.querySelector('summary').click();
+        }
+        const faq = doc().querySelector('#faq');
+        check(faq && faq.querySelectorAll('details').length >= 4, 'FAQ keeps accessible native disclosure controls');
+        const fileFaq = [...faq.querySelectorAll('details')].find(details => /file formats/i.test(details.querySelector('summary')?.textContent || ''));
+        check(fileFaq && /STL/.test(fileFaq.textContent) && /3MF/.test(fileFaq.textContent) && /OBJ/.test(fileFaq.textContent), 'FAQ retains supported model formats');
+        fileFaq.querySelector('summary').click();
+        check(fileFaq.open, 'FAQ answers can be opened');
+        fileFaq.querySelector('summary').click();
+        await route('#/', '.hero h1');
+        doc().querySelector('.skip-link').click();
+        check(doc().activeElement === doc().querySelector('main'), 'Skip to content moves keyboard focus to the page');
+        for (const section of ['printers', 'faq']) {
+          doc().querySelector('a[href="#/' + section + '"]').click();
+          await until(() => {
+            const top = doc().querySelector('#' + section)?.getBoundingClientRect().top;
+            return top >= 56 && top <= 80;
+          }, 'navigation scrolls to ' + section);
+          check(true, 'Public navigation opens ' + section + ' below the sticky navigation');
+        }
+        await route('#/', '.hero h1');
+        await until(() => win().scrollY === 0, 'return to homepage top');
+        check(true, 'Home navigation returns to the top after opening a section');
+        for (const theme of ['light', 'dark']) {
+          doc().querySelector('.appearance-controls summary').click();
+          doc().querySelector('[data-action="set-theme"][data-theme="' + theme + '"]').click();
+          doc().querySelector('.appearance-controls summary').click();
+          check(doc().documentElement.dataset.theme === theme && localStorage.getItem('three-d-print-farm-theme') === theme, theme + ' appearance control applies and saves the selected theme');
+          await new Promise(resolve => {
+            frame.addEventListener('load', resolve, { once: true });
+            frame.src = '../index.html?appearance-check=' + theme + '#/';
+          });
+          await until(() => doc()?.querySelector('.hero h1') && doc().querySelector('.public-header')?.dataset.surface === theme, theme + ' saved appearance after reload');
+          await settle();
+          checkHomeDesign(theme, parseFloat(frame.style.width));
+          check(true, theme + ' saved theme and artwork survive a full reload');
+          for (const width of widths) {
+            frame.style.width = width + 'px';
+            await route('#/', '.hero h1');
+            await until(() => doc().querySelector('.public-header')?.dataset.surface === theme, theme + ' ' + width + 'px themed hero surface');
+            await settle();
+            checkHomeDesign(theme, width);
+            await checkMenu(theme, width);
+            await checkStickyHeader(theme, width);
+            await route('#/get-started', '#model-file');
+            noOverflow(theme + ' ' + width + 'px request form fits the viewport');
+            await route('#/my-jobs', '.page-title-row');
+            noOverflow(theme + ' ' + width + 'px personal job list fits the viewport');
+          }
+        }
+        results.textContent = passed.length + ' redesign checks passed\n' + passed.join('\n');
+      } catch (error) {
+        results.className = 'failed';
+        results.textContent = passed.join('\n') + '\nFAIL · ' + error.message;
+        console.error(error);
+      } finally {
+        frame.src = 'about:blank';
+        for (const [key, value] of backup) {
+          if (value === null) localStorage.removeItem(key);
+          else localStorage.setItem(key, value);
+        }
+        frame.style.width = '100%';
+        frame.style.height = '1000px';
+        run.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

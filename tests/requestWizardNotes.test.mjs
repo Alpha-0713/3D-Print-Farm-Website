@@ -49,7 +49,7 @@ function wizardState(notes = "", step = 3) {
 function submittedRequest(notes) {
   return {
     projectName: "Regression test project",
-    file: { name: "sample.stl", sizeBytes: 1024 },
+    modelUrl: "https://example.com/sample.stl", submissionKey: crypto.randomUUID(),
     material: "PLA",
     color: "Black",
     inventoryId: "test-black",

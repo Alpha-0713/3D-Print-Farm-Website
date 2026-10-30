@@ -37,6 +37,7 @@ export function groupFilaments(items) {
 
 export function setFilamentSelection(wizard, item) {
   if (!canSelectFilament(item)) throw new Error("That filament is unavailable or its colour needs verification. Choose another colour.");
+  wizard.selectionError = "";
   wizard.inventoryId = item.id;
   wizard.material = item.material;
   wizard.color = item.color;

@@ -1,13 +1,15 @@
 <!doctype html><html lang="en" data-theme="dark" data-accent="monochrome"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sidebar regression checks · v2.2</title>
 <link rel="stylesheet" href="../src/styles.css?v=2.2&amp;rev=7">
-<style>.check-toolbar{padding:20px 28px;border-bottom:1px solid var(--border)}.check-toolbar h1{font-size:20px;margin:0 0 8px}.check-toolbar button{padding:10px 16px;background:var(--accent-primary);color:var(--accent-foreground);border:0;cursor:pointer}.check-toolbar a{margin-left:20px;text-decoration:underline}#results{font:13px system-ui;white-space:pre-wrap;line-height:1.7}.check-failed{color:var(--error)}</style>
-</head><body><div class="check-toolbar"><h1>Sidebar regression checks</h1><button id="run" disabled>Run checks</button><a href="../#/staff">Open the website</a><div id="results" role="status">Uses production staff components and DOM updates. No account or job data is changed.</div></div><div id="fixture"></div>
+<link rel="stylesheet" href="../src/apple-interface.css?v=2.4&amp;rev=4"><link rel="stylesheet" href="../src/apple-public.css?v=2.4&amp;rev=4">
+<style>@import url("../src/fonts.css");.check-toolbar{padding:20px 28px;border-bottom:1px solid var(--border)}.check-toolbar h1{font-size:20px;margin:0 0 8px}.check-toolbar button{padding:10px 16px;background:var(--accent-primary);color:var(--accent-foreground);border:0;cursor:pointer}.check-toolbar a{margin-left:20px;text-decoration:underline}#results{font:13px "Inter", Arial, sans-serif;white-space:pre-wrap;line-height:1.7}.check-failed{color:var(--error)}</style>
+</head><body><div class="check-toolbar"><h1>Sidebar regression checks</h1><button id="run" disabled>Run checks</button><a href="../#/staff">Open the website</a><div id="results" role="status">Uses production staff components and DOM updates. No job data is changed. The original demo identity is restored afterward.</div></div><div id="fixture"></div>
 <script type="module">
 import { staffShell } from "../src/staffPages.js?v=2.2&rev=5";
 import { commitPage } from "../src/pageCommit.js?v=2.2&rev=5";
 import { syncFloatingControls } from "../src/floatingControls.js?v=2.2&rev=5";
 import { syncSidebarSelection } from "../src/sidebarSelection.js?v=2.2&rev=5";
+import { authService } from "../src/authService.js?v=2.2&rev=5";
 const root = document.querySelector('#fixture');
 const results = document.querySelector('#results');
 const html = (active, copy = '') => staffShell(`<h1>Preview ${active}</h1><p>${copy || 'Navigation-only fixture. No work records are modified.'}</p>`, active);
@@ -26,7 +28,9 @@ document.querySelector('#run').addEventListener('click', async () => {
   await new Promise(requestAnimationFrame);
   const passed = [];
   const check = (condition, label) => { if (!condition) throw new Error(label); passed.push(`PASS · ${label}`); };
+  const previousIdentity = authService.getCurrentIdentity().id;
   try {
+    authService.switchRole('demo-person-02');
     render('overview');
     const shell = root.querySelector('.staff-app'), side = root.querySelector('.staff-sidebar'), marker = root.querySelector('.sidebar-selection'), nav = side.querySelector('nav'), controls = root.querySelector('.toolbar-controls'), profile = controls.querySelector('.role-switcher');
     const link = side.querySelector('a[href="#/staff/active"]');
@@ -60,7 +64,7 @@ document.querySelector('#run').addEventListener('click', async () => {
     const initials = picker.querySelector('.role-trigger-initials').textContent;
     const names = [...picker.querySelectorAll('.role-option-name')].map((item) => item.textContent);
     check(!picker.querySelector('.role-trigger-name') && initials.trim().length > 0, 'Identity always shows initials with full names available in the menu');
-    check(getComputedStyle(picker.querySelector('summary')).width === '36px' && names.length > 0, 'Identity retains compact dimensions and all account choices');
+    check(getComputedStyle(picker.querySelector('summary')).width === '44px' && names.length > 0, 'Identity retains 44px touch targets and all account choices');
     const withinWindow = (menu) => {
       const rect = menu.getBoundingClientRect();
       return rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1;
@@ -75,6 +79,7 @@ document.querySelector('#run').addEventListener('click', async () => {
     picker.open = false;
     results.className = ''; results.textContent = `${passed.length} checks passed\n` + passed.join('\n');
   } catch (error) { results.className = 'check-failed'; results.textContent = passed.join('\n') + '\nFAIL · ' + error.message; }
+  finally { authService.switchRole(previousIdentity); render('overview'); }
 });
 document.querySelector("#run").disabled=false;
 </script></body></html>

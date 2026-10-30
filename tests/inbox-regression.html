@@ -1,7 +1,8 @@
 <!doctype html><html lang="en" data-theme="dark" data-accent="monochrome"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inbox and workflow browser checks · v2.2</title>
 <link rel="stylesheet" href="../src/styles.css?v=2.2&amp;rev=8">
-<style>.check-toolbar{padding:20px 28px;border-bottom:1px solid var(--border)}.check-toolbar h1{font-size:20px;margin:0 0 8px}.check-toolbar button{padding:10px 16px;background:var(--accent-primary);color:var(--accent-foreground);border:0;cursor:pointer}.check-toolbar a{margin-left:20px;text-decoration:underline}#results{font:13px system-ui;white-space:pre-wrap;line-height:1.7}.check-failed{color:var(--error-ink)}#fixture{position:relative}</style>
+<link rel="stylesheet" href="../src/apple-interface.css?v=2.4&amp;rev=4"><link rel="stylesheet" href="../src/apple-public.css?v=2.4&amp;rev=4">
+<style>@import url("../src/fonts.css");.check-toolbar{padding:20px 28px;border-bottom:1px solid var(--border)}.check-toolbar h1{font-size:20px;margin:0 0 8px}.check-toolbar button{padding:10px 16px;background:var(--accent-primary);color:var(--accent-foreground);border:0;cursor:pointer}.check-toolbar a{margin-left:20px;text-decoration:underline}#results{font:13px "Inter", Arial, sans-serif;white-space:pre-wrap;line-height:1.7}.check-failed{color:var(--error-ink)}#fixture{position:relative}</style>
 </head><body><div class="check-toolbar"><h1>Inbox and workflow browser checks</h1><button id="run" disabled>Run browser checks</button><a href="../#/staff">Open the website</a><p>Creates synthetic test records, then restores this origin’s previous application data. No backend or messages.</p><div id="results" role="status">Ready. Run at desktop and mobile widths.</div></div><div id="fixture"></div>
 <script>window.addEventListener("error", event => { document.querySelector("#results").textContent = "FAIL · " + event.message; });</script>
 <script type="module">
@@ -47,7 +48,7 @@ document.querySelector('#run').addEventListener('click', async () => {
     check(inside(inbox.querySelector('.inbox-panel')),'Inbox fits inside the visible viewport');
     appearance.querySelector('summary').click();await frame();
     check(appearance.open&&!inbox.open&&openMenus()===1,'Opening Appearance closes Inbox');
-    const job=await jobsService.createJob({projectName:'QA browser bracket',file:{name:'qa.stl',sizeBytes:256},inventoryId:'qa',material:'PLA',color:'Gray',notes:'Synthetic browser check'});
+    const job=await jobsService.createJob({submissionKey:crypto.randomUUID(),projectName:'QA browser bracket',modelUrl:'https://example.com/qa.stl',inventoryId:'qa',material:'PLA',color:'Gray',notes:'Synthetic browser check'});
     await until(()=>!root.querySelector('.inbox-dot').hidden,'new inbox indicator');
     await until(()=>document.querySelector('.inbox-toast'),'notification toast');
     check(appearance.open&&openMenus()===1,'A new notification toast leaves the active menu alone');
@@ -108,7 +109,7 @@ document.querySelector('#run').addEventListener('click', async () => {
     check(!(await jobDetailsPage(job.id)).toLowerCase().includes('job history'),'Staff details contain Print Progress without Job History');
     for(const theme of ['light','dark']){document.documentElement.dataset.theme=theme;const reset=root.querySelector('[data-action="reset-local-data"]');const colour=getComputedStyle(reset).color;const expected=getComputedStyle(document.documentElement).getPropertyValue('--error-ink').trim();check(colour!==getComputedStyle(root).color&&Boolean(expected),'Reset uses destructive colour in '+theme+' mode');}
     check(root.querySelectorAll('.status i').length===0,'Print status badges have no decorative dots');
-    authService.switchRole('demo-person-04');await render();const before=(await inboxService.list()).length;await jobsService.createJob({projectName:'QA hours context',file:{name:'qa.stl',sizeBytes:256},inventoryId:'qa',material:'PLA',color:'Gray'});await syncPersonalInbox(root);check((await inboxService.list()).length===before+1,'Saved updates add one notification without duplicate rerender effects');
+    authService.switchRole('demo-person-04');await render();const before=(await inboxService.list()).length;await jobsService.createJob({submissionKey:crypto.randomUUID(),projectName:'QA hours context',modelUrl:'https://example.com/qa.stl',inventoryId:'qa',material:'PLA',color:'Gray'});await syncPersonalInbox(root);check((await inboxService.list()).length===before+1,'Saved updates add one notification without duplicate rerender effects');
     check(!errors.length,'No inbox action errors');
     results.className='';results.textContent=passed.length+' browser checks passed at '+innerWidth+'px\n'+passed.join('\n');
   } catch(error){results.className='check-failed';results.textContent=passed.join('\n')+'\nFAIL · '+error.message+'\n'+JSON.stringify({panel:root.querySelector('.inbox-panel')?.getBoundingClientRect().toJSON(),style:root.querySelector('.inbox-panel')?.getAttribute('style'),picker:root.querySelector('.inbox-picker')?.getBoundingClientRect().toJSON(),viewport:{w:innerWidth,h:innerHeight},scrollY},null,2);console.error(error);}

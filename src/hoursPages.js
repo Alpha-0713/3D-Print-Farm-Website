@@ -59,7 +59,7 @@ function personalHoursPage(dashboard, role) {
     </form>
   </section>` : "";
 
-  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / HOURS</span><h1>Hours</h1><p>Your personal hour balance, adjustment requests, and transaction history.</p></div><span class="demo-pill">LOCAL DEMO STORAGE</span></div>
+  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / HOURS</span><h1>Hours</h1><p>Your personal hour balance, adjustment requests, and transaction history.</p></div><span class="demo-pill">${authService.mode === "demo" ? "LOCAL DEMO STORAGE" : "API WORKSPACE"}</span></div>
   <section class="hours-personal-overview">
     <article class="hours-balance-card"><span>YOUR CURRENT BALANCE</span><strong>${formatHours(dashboard.balanceCenti)}</strong><p>Calculated from your saved hour transactions. New staff start at zero.</p></article>
     <article class="hours-overview-stat"><span>PENDING REQUESTS</span><strong>${dashboard.pendingCount}</strong><p>${dashboard.pendingCount ? "Awaiting a Level 4 decision" : "No requests awaiting review"}</p></article>
@@ -72,7 +72,7 @@ function personalHoursPage(dashboard, role) {
   <section class="staff-section hours-history-section"><div class="staff-section-head"><div><h2>Your transaction history</h2><p>Completed adjustments are recorded with the acting staff member, reason, and before-and-after balance.</p></div></div>
     ${transactionCards(dashboard.transactions, "Completed adjustments will be listed here. Your starting balance is zero hours.")}
   </section>
-  <div class="staff-note"><span>ⓘ</span><p>Hours are stored in this browser for demonstration purposes. This page does not authenticate your identity or provide shared, server-side accounting.</p></div>`, "hours");
+  <div class="staff-note"><span>ⓘ</span><p>${authService.mode === "demo" ? "Hours are stored in this browser for demonstration purposes. This page does not authenticate your identity or provide shared, server-side accounting." : "Hour requests and transactions are managed by the connected server."}</p></div>`, "hours");
 }
 
 function requestSummary(requests) {
@@ -133,13 +133,13 @@ async function levelFourHoursPage({ staffId, search }) {
     staffId ? hoursService.getAdminActivity(staffId).catch(() => []) : Promise.resolve([]),
   ]);
   const selectedDetail = detail ? { ...detail, activity } : detail;
-  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / HOURS</span><h1>Hours</h1><p>Give hours to Level 2 and Level 3 staff, review requests, and see their contribution history.</p></div><span class="demo-pill">LOCAL DEMO STORAGE</span></div>
+  return staffShell(`<div class="staff-page-heading"><div><span class="eyebrow">STAFF PORTAL / HOURS</span><h1>Hours</h1><p>Give hours to Level 2 and Level 3 staff, review requests, and see their contribution history.</p></div><span class="demo-pill">${authService.mode === "demo" ? "LOCAL DEMO STORAGE" : "API WORKSPACE"}</span></div>
   ${staffId ? staffDetailPanel(selectedDetail) : ""}
   <section class="staff-section hours-admin-staff-section"><div class="staff-section-head"><div><h2>Choose a staff member</h2><p>Only existing Level 2 and Level 3 accounts appear here. Select a person to give hours or review their history.</p></div></div>
     <form class="hours-admin-filter-form" data-form="hours-admin-filter"><label class="field"><span>Search by name</span><input type="search" name="search" value="${esc(search)}" placeholder="Enter a staff name" /></label><button class="button button-lime button-small" type="submit">Search</button></form>
     ${staffOverviewTable(staff)}
   </section>
-  <div class="staff-note"><span>ⓘ</span><p>Level 4 permissions and hour data are enforced in the browser application only. This static demo has no trusted server-side authorization or shared database.</p></div>`, "hours");
+  <div class="staff-note"><span>ⓘ</span><p>${authService.mode === "demo" ? "Level 4 permissions and hour data are enforced in the browser application only. This static demo has no trusted server-side authorization or shared database." : "The server must authorize all hour decisions and record balance changes atomically."}</p></div>`, "hours");
 }
 
 export async function staffHours({ staffId = "", search = "" } = {}) {

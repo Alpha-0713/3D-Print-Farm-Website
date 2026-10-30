@@ -1,0 +1,11 @@
+/* Inter 4.1, self-hosted. See assets/fonts/Inter-LICENSE.txt. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/InterVariable.woff2?v=inter-20261030-3") format("woff2");
+}
+
+/* Keep native form controls and diagnostic text on the same authored font stack. */
+button, input, select, textarea, option, pre, code, kbd, samp { font-family: "Inter", Arial, sans-serif; }

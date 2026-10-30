@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f5f5f7" />
     <script>
       (() => {
-        document.documentElement.dataset.accent = "monochrome";
+        document.documentElement.dataset.accent = "blue";
         const themes = ["light", "dark"];
         try {
           const savedTheme = localStorage.getItem("three-d-print-farm-theme");
@@ -16,32 +16,100 @@
           document.querySelector('meta[name="theme-color"]').content =
             document.documentElement.dataset.theme === "light" ? "#f5f5f7" : "#111112";
         } catch {
-          document.documentElement.dataset.accent = "monochrome";
+          document.documentElement.dataset.accent = "blue";
           document.documentElement.dataset.theme =
             window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
         }
       })();
     </script>
-    <meta name="description" content="School 3D Print Farm Website — v2.3 demo with a refined, accessible motion system, role-based access control, staff hours management, and filament availability." />
-    <meta name="version" content="v2.3" />
-    <title>School 3D Print Farm Website — v2.3</title>
+    <meta name="description" content="School 3D Print Farm Website — v2.4 — submit a print request, explore our printers, track projects, and manage the school print farm." />
+    <meta name="version" content="v2.4" />
+    <title>School 3D Print Farm Website — v2.4</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=2.2&amp;rev=4" />
-    <link rel="stylesheet" href="./src/styles.css?v=2.3&amp;rev=1" />
+    <link rel="preload" href="./assets/fonts/InterVariable.woff2?v=inter-20261030-3" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./src/fonts.css?v=inter-20261030-3" />
+    <link rel="stylesheet" href="./src/styles.css?v=inter-20261030-3" />
+    <link rel="stylesheet" href="./src/apple-interface.css?v=inter-20261030-3" />
+    <link rel="stylesheet" href="./src/apple-public.css?v=inter-20261030-3" />
     <script type="importmap">{
-      "imports": {
-        "./src/pageShared.js?v=2.2&rev=5": "./src/pageShared.js?v=2.2&rev=6",
-        "./src/staffPages.js?v=2.2&rev=5": "./src/staffPages.js?v=2.3",
-        "./src/personalInbox.js?v=2.2&rev=5": "./src/personalInbox.js?v=2.2&rev=6",
-        "./src/floatingControls.js?v=2.2&rev=5": "./src/floatingControls.js?v=2.2&rev=6",
-        "./src/pageCommit.js?v=2.2&rev=5": "./src/pageCommit.js?v=2.2&rev=6",
-        "./src/services.js?v=2.2&rev=5": "./src/services.js?v=2.3",
-        "./src/modelPreview.js?v=2.2&rev=5": "./src/modelPreview.js?v=2.3",
-        "./src/requestWizard.js?v=2.2&rev=5": "./src/requestWizard.js?v=2.3",
-        "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
-      }
-    }</script>
-    <script type="module" src="./src/app.js?v=2.3&amp;rev=1"></script>
+  "imports": {
+    "./src/apiClient.js": "./src/apiClient.js?v=inter-20261030-3",
+    "./src/apiClient.js?v=2.2&rev=5": "./src/apiClient.js?v=inter-20261030-3",
+    "./src/app.js": "./src/app.js?v=inter-20261030-3",
+    "./src/attachments.js": "./src/attachments.js?v=inter-20261030-3",
+    "./src/authService.js": "./src/authService.js?v=inter-20261030-3",
+    "./src/authService.js?v=2.2&rev=5": "./src/authService.js?v=inter-20261030-3",
+    "./src/authorization.js": "./src/authorization.js?v=inter-20261030-3",
+    "./src/authorization.js?v=2.2&rev=5": "./src/authorization.js?v=inter-20261030-3",
+    "./src/config.js": "./src/config.js?v=inter-20261030-3",
+    "./src/data.js": "./src/data.js?v=inter-20261030-3",
+    "./src/data.js?v=2.2&rev=5": "./src/data.js?v=inter-20261030-3",
+    "./src/demo/fileStore.js": "./src/demo/fileStore.js?v=inter-20261030-3",
+    "./src/demo/files.js": "./src/demo/files.js?v=inter-20261030-3",
+    "./src/demo/services.js": "./src/demo/services.js?v=inter-20261030-3",
+    "./src/demo/session.js": "./src/demo/session.js?v=inter-20261030-3",
+    "./src/filamentColor.js": "./src/filamentColor.js?v=inter-20261030-3",
+    "./src/filamentColor.js?v=2.2&rev=5": "./src/filamentColor.js?v=inter-20261030-3",
+    "./src/filamentPalette.js": "./src/filamentPalette.js?v=inter-20261030-3",
+    "./src/filamentPalette.js?v=2.2&rev=5": "./src/filamentPalette.js?v=inter-20261030-3",
+    "./src/fileValidation.js": "./src/fileValidation.js?v=inter-20261030-3",
+    "./src/filesService.js": "./src/filesService.js?v=inter-20261030-3",
+    "./src/filesService.js?v=2.2&rev=5": "./src/filesService.js?v=inter-20261030-3",
+    "./src/floatingControls.js": "./src/floatingControls.js?v=inter-20261030-3",
+    "./src/floatingControls.js?v=2.2&rev=5": "./src/floatingControls.js?v=inter-20261030-3",
+    "./src/headerSurface.js": "./src/headerSurface.js?v=inter-20261030-3",
+    "./src/headerSurface.js?v=2.4&rev=4": "./src/headerSurface.js?v=inter-20261030-3",
+    "./src/hoursPages.js": "./src/hoursPages.js?v=inter-20261030-3",
+    "./src/hoursPages.js?v=2.2&rev=5": "./src/hoursPages.js?v=inter-20261030-3",
+    "./src/httpServices.js": "./src/httpServices.js?v=inter-20261030-3",
+    "./src/httpSession.js": "./src/httpSession.js?v=inter-20261030-3",
+    "./src/inboxEvents.js": "./src/inboxEvents.js?v=inter-20261030-3",
+    "./src/inboxEvents.js?v=2.2&rev=5": "./src/inboxEvents.js?v=inter-20261030-3",
+    "./src/jobModelFiles.js": "./src/jobModelFiles.js?v=inter-20261030-3",
+    "./src/jobModelFiles.js?v=2.3": "./src/jobModelFiles.js?v=inter-20261030-3",
+    "./src/jobProgress.js": "./src/jobProgress.js?v=inter-20261030-3",
+    "./src/jobProgress.js?v=2.2&rev=5": "./src/jobProgress.js?v=inter-20261030-3",
+    "./src/jobWorkflow.js": "./src/jobWorkflow.js?v=inter-20261030-3",
+    "./src/jobWorkflow.js?v=2.2&rev=5": "./src/jobWorkflow.js?v=inter-20261030-3",
+    "./src/modelFilesStore.js": "./src/modelFilesStore.js?v=inter-20261030-3",
+    "./src/modelFilesStore.js?v=2.3": "./src/modelFilesStore.js?v=inter-20261030-3",
+    "./src/modelPreview.js": "./src/modelPreview.js?v=inter-20261030-3",
+    "./src/modelPreview.js?v=2.2&rev=5": "./src/modelPreview.js?v=inter-20261030-3",
+    "./src/notificationsService.js": "./src/notificationsService.js?v=inter-20261030-3",
+    "./src/notificationsService.js?v=2.2&rev=5": "./src/notificationsService.js?v=inter-20261030-3",
+    "./src/pageCommit.js": "./src/pageCommit.js?v=inter-20261030-3",
+    "./src/pageCommit.js?v=2.2&rev=5": "./src/pageCommit.js?v=inter-20261030-3",
+    "./src/pageShared.js": "./src/pageShared.js?v=inter-20261030-3",
+    "./src/pageShared.js?v=2.2&rev=5": "./src/pageShared.js?v=inter-20261030-3",
+    "./src/pageShared.js?v=2.4&rev=4": "./src/pageShared.js?v=inter-20261030-3",
+    "./src/personalInbox.js": "./src/personalInbox.js?v=inter-20261030-3",
+    "./src/personalInbox.js?v=2.2&rev=5": "./src/personalInbox.js?v=inter-20261030-3",
+    "./src/publicPages.js": "./src/publicPages.js?v=inter-20261030-3",
+    "./src/publicPages.js?v=2.2&rev=5": "./src/publicPages.js?v=inter-20261030-3",
+    "./src/publicPages.js?v=2.4&rev=5": "./src/publicPages.js?v=inter-20261030-3",
+    "./src/requestValidation.js": "./src/requestValidation.js?v=inter-20261030-3",
+    "./src/requestWizard.js": "./src/requestWizard.js?v=inter-20261030-3",
+    "./src/requestWizard.js?v=2.2&rev=5": "./src/requestWizard.js?v=inter-20261030-3",
+    "./src/routes.js": "./src/routes.js?v=inter-20261030-3",
+    "./src/serviceError.js": "./src/serviceError.js?v=inter-20261030-3",
+    "./src/services.js": "./src/services.js?v=inter-20261030-3",
+    "./src/services.js?v=2.2&rev=5": "./src/services.js?v=inter-20261030-3",
+    "./src/sidebarSelection.js": "./src/sidebarSelection.js?v=inter-20261030-3",
+    "./src/sidebarSelection.js?v=2.2&rev=5": "./src/sidebarSelection.js?v=inter-20261030-3",
+    "./src/sidebarState.js": "./src/sidebarState.js?v=inter-20261030-3",
+    "./src/sidebarState.js?v=2.3": "./src/sidebarState.js?v=inter-20261030-3",
+    "./src/staffPages.js": "./src/staffPages.js?v=inter-20261030-3",
+    "./src/staffPages.js?v=2.2&rev=5": "./src/staffPages.js?v=inter-20261030-3",
+    "./src/studentPages.js": "./src/studentPages.js?v=inter-20261030-3",
+    "./src/studentPages.js?v=2.2&rev=5": "./src/studentPages.js?v=inter-20261030-3",
+    "./src/visualComponents.js": "./src/visualComponents.js?v=inter-20261030-3",
+    "./src/visualComponents.js?v=2.2&rev=5": "./src/visualComponents.js?v=inter-20261030-3",
+    "./src/wizardState.js": "./src/wizardState.js?v=inter-20261030-3",
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}</script>
+    <script type="module" src="./src/app.js?v=inter-20261030-3"></script>
   </head>
   <body>
     <div id="app"></div>

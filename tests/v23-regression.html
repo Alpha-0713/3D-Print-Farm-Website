@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v2.3 regression checks</title><style>body{font:14px/1.6 system-ui;background:#161616;color:#eee;margin:20px}button{padding:10px;cursor:pointer}pre{white-space:pre-wrap}iframe{width:100%;height:900px;border:1px solid #555;display:block}</style><h1>v2.3 regression checks</h1><p>Uses synthetic models, backs up browser demo records, and removes only files created by this run. No network upload or real printer action.</p><button id="run">Run v2.3 checks</button><button id="show">Show sample model job</button><pre id="result">Ready.</pre><iframe id="app-frame" title="Production app under test"></iframe><script type="module">
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v2.3 regression checks</title><style>@import url("../src/fonts.css");body{font:14px/1.6 "Inter", Arial, sans-serif;background:#161616;color:#eee;margin:20px}button{padding:10px;cursor:pointer}pre{white-space:pre-wrap}iframe{width:100%;height:900px;border:1px solid #555;display:block}</style><h1>v2.3 regression checks</h1><p>Uses synthetic models, backs up browser demo records, and removes only files created by this run. No network upload or real printer action.</p><button id="run">Run v2.3 checks</button><button id="show">Show sample model job</button><pre id="result">Ready.</pre><iframe id="app-frame" title="Production app under test"></iframe><script type="module">
 import { jobsService, LOCAL_DATA_KEYS } from '../src/services.js?v=2.2&rev=5';
 import { authService } from '../src/authService.js?v=2.2&rev=5';
 import { modelFilesStore, jobAttachments } from '../src/modelFilesStore.js?v=2.3';
@@ -16,7 +16,7 @@ async function setup(){
  localStorage.setItem(key,JSON.stringify({jobs:[],notifications:[],inventory:[{id:'v23-gray',material:'PLA',color:'Demo gray',hexColor:'#808080',available:true,lowStock:false}],contributions:[],hours:{transactions:[],requests:[]}}));
  authService.switchRole('demo-person-01');
  const files=await Promise.all(['stl','obj','3mf'].map(async extension=>new File([await(await fetch('./fixtures/test-part.'+extension)).arrayBuffer()],'Demo original.'+extension)));
- const job=await jobsService.createJob({projectName:'Demo model inspection',file:{name:files[0].name,sizeBytes:files[0].size},modelFiles:files,inventoryId:'v23-gray',material:'PLA',color:'Demo gray'});
+ const job=await jobsService.createJob({submissionKey:crypto.randomUUID(),projectName:'Demo model inspection',file:{name:files[0].name,sizeBytes:files[0].size},modelFiles:files,inventoryId:'v23-gray',material:'PLA',color:'Demo gray'});
  savedIds=job.attachments.map(file=>file.id);jobId=job.id;
  authService.switchRole('demo-person-04');await jobsService.reviewRequest(job.id,'approved');
  authService.switchRole('demo-person-02');await jobsService.claimJob(job.id);
@@ -38,7 +38,7 @@ document.querySelector('#run').onclick=async()=>{
  const nativeAdd=IDBObjectStore.prototype.add;
  IDBObjectStore.prototype.add=function(){throw new DOMException('Synthetic storage limit','QuotaExceededError');};
  let storageRejected=false;
- try{await jobsService.createJob({projectName:'Storage failure demo',file:{name:files[0].name,sizeBytes:files[0].size},modelFiles:[files[0]],material:'PLA',color:'Demo gray',inventoryId:'v23-gray'});}catch{storageRejected=true;}finally{IDBObjectStore.prototype.add=nativeAdd;}
+ try{await jobsService.createJob({submissionKey:crypto.randomUUID(),projectName:'Storage failure demo',file:{name:files[0].name,sizeBytes:files[0].size},modelFiles:[files[0]],material:'PLA',color:'Demo gray',inventoryId:'v23-gray'});}catch{storageRejected=true;}finally{IDBObjectStore.prototype.add=nativeAdd;}
  check(storageRejected&&JSON.parse(localStorage.getItem(key)).jobs.length===beforeFailure,'Unavailable file storage rejects submission without creating a partial job');
  await wait(()=>doc().querySelector('.job-model-preview canvas'),'STL viewer');await wait(()=>!doc().querySelector('[data-action="reset-job-camera"]').disabled,'STL ready');check(true,'STL preview loads in real job details');
  for(const[index,extension]of [[1,'OBJ'],[2,'3MF']]){

@@ -17,7 +17,7 @@ let toastExitTimer;
 let toastQueue = [];
 let currentToast = null;
 let contentSignature = "";
-const routeFor = (item) => item.jobId ? `#/staff/jobs/${encodeURIComponent(item.jobId)}`
+const routeFor = (item) => item.jobId ? `${authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW) ? "#/staff/jobs/" : "#/my-jobs/"}${encodeURIComponent(item.jobId)}`
   : item.kind === "hours-review" ? `#/staff/hours/staff/${encodeURIComponent(item.requesterId)}?request=${encodeURIComponent(item.requestId)}` : "#/staff/hours";
 const closeMenus = (root) => root.querySelectorAll(".accent-picker[open], .role-switcher[open], .inbox-picker[open]").forEach((menu) => { menu.open = false; });
 
@@ -38,7 +38,7 @@ function showNextToast() {
     event.stopPropagation();
     const root = mountedRoot;
     if (!root?.isConnected) { dismissToast(); return; }
-    if (authService.getCurrentIdentity().id !== identityId) { dismissToast(); return; }
+    if (authService.getCurrentIdentity()?.id !== identityId) { dismissToast(); return; }
     closeMenus(root);
     const menu = root.querySelector(".inbox-picker");
     if (menu && entries.some((entry) => entry.id === item.id)) {
@@ -62,7 +62,7 @@ function dismissToast() {
     showNextToast();
   }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 160);
 }
-function resetInboxSession() {
+export function resetInboxSession() {
   revision += 1;
   identityId = null;
   entries = [];
@@ -81,11 +81,11 @@ async function detailMarkup(item) {
   const supervisor = authService.can(PERMISSIONS.JOBS_APPROVE);
   let obsolete = false;
   if (item.jobId) {
-    const job = await jobsService.getJob(item.jobId);
+    const job = await (authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW) ? jobsService.getJob(item.jobId) : jobsService.getMyJob(item.jobId));
     if (!job) return '<p class="inbox-muted">This job is no longer available to your account.</p>';
     actions.push(`<a class="button button-outline button-small" data-inbox-navigate href="${routeFor(item)}">${supervisor && ["initial-review", "print-review"].includes(item.kind) ? "Review job" : "View job"}</a>`);
     const button = (action, label, style = "button-lime") => `<button class="button ${style} button-small" data-action="${action}" data-id="${esc(job.id)}" data-expected-at="${esc(item.createdAt)}" data-authorization-id="${esc(item.authorizationId || "")}">${label}</button>`;
-    if (item.kind === "available-job") {
+    if (item.kind === "available-job" && authService.can(PERMISSIONS.JOBS_MANAGE)) {
       if (claimable(job)) actions.push(button("claim-job", "Claim job"));
       else obsolete = true;
     }
@@ -105,7 +105,7 @@ async function detailMarkup(item) {
       if (!dashboard) return '<p class="inbox-muted">This staff record is no longer available. Open Hours to review current records.</p>';
       const request = dashboard.requests.find((request) => request.id === item.requestId);
       obsolete = !request || request.status !== "Pending";
-      if (!obsolete && request.requesterId !== authService.getCurrentIdentity().id) {
+      if (!obsolete && request.requesterId !== authService.getCurrentIdentity()?.id) {
         const attrs = `data-id="${esc(request.id)}" data-name="${esc(dashboard.name)}" data-hours="${request.hoursCenti / 100} hours" data-type="${request.adjustmentType === "add" ? "additional hours" : "correction / deduction"}"`;
         actions.push(`<button class="button button-lime button-small" data-action="hours-approve" ${attrs}>Approve hours</button><button class="button button-outline button-small" data-action="hours-reject" ${attrs}>Reject hours</button>`);
       }
@@ -132,13 +132,13 @@ async function paint(root, force = false) {
 
 export async function syncPersonalInbox(root) {
   mountedRoot = root;
-  if (!authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW)) { resetInboxSession(); return; }
+  if (!authService.getCurrentIdentity()) { resetInboxSession(); return; }
   const user = authService.getCurrentIdentity();
   const changedIdentity = user.id !== identityId;
   if (changedIdentity) { resetInboxSession(); identityId = user.id; }
   const call = ++revision;
-  const [inbox, supervisors] = await Promise.all([inboxService.list(), presenceService.list()]);
-  if (call !== revision || authService.getCurrentIdentity().id !== user.id) return;
+  const [inbox, supervisors] = await Promise.all([inboxService.list(), authService.can(PERMISSIONS.STAFF_DASHBOARD_VIEW) ? presenceService.list() : Promise.resolve([])]);
+  if (call !== revision || authService.getCurrentIdentity()?.id !== user.id) return;
   const arrivals = changedIdentity ? [] : inbox.filter((item) => !seen.has(item.id));
   entries = inbox;
   for (const item of inbox) seen.add(item.id);
@@ -162,7 +162,7 @@ export function bindPersonalInbox(root, reportError) {
     const user = identityId;
     try {
       const item = await inboxService.open(id);
-      if (authService.getCurrentIdentity().id !== user) return;
+      if (authService.getCurrentIdentity()?.id !== user) return;
       opened = item;
       await syncPersonalInbox(root);
       root.querySelector(".inbox-detail h2")?.focus();
