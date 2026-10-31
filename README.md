@@ -1,6 +1,6 @@
 # 3D Print Farm · v2.4
 
-**Backend** joined the party. - Coming soon!
+--**Backend**-- joined the party. Coming soon!
 
 A responsive vanilla JavaScript frontend for school print requests, two-stage approval, filament, staff hours, notifications and job tracking, with light/dark themes and Level 1–4 permissions.
 
